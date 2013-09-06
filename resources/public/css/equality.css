@@ -38,12 +38,13 @@
 {
     position:absolute;
     background: transparent;
-    border: 1px dotted rgba(0,0,0,0.3);
+    border: 1px dotted rgba(0,0,0,0.0);
     cursor: pointer;
+    overflow: hidden;
 }
 .symbol.selected
 {
-    border: 1px solid rgba(0,0,0,0.8);
+    border: 1px solid rgba(180,0,0,0.8);
 }
 
 .frac {

@@ -7,6 +7,7 @@ var selectedSymbol = null;
 var inputBox = null;
 
 var symbols = ["+", "-", "="];
+var fracAspectRatio = 100;
 
 $(function ()
 {
@@ -21,19 +22,19 @@ $(function ()
     {
         //console.log($(e.target).position(), e.pageX, e.pageY);
         dragStartPos = {x: e.pageX, y: e.pageY};
-        draggingSymbolStartPos = $(e.target).position();
-        draggingSymbol = $(e.target);
-        select($(e.target));
+        draggingSymbolStartPos = $(e.target).closest(".symbol").position();
+        draggingSymbol = $(e.target).closest(".symbol");
+        select($(e.target).closest(".symbol"));
     });
     
-    $("#canvas").on("mousedown", function(e)
+    $("#canvas").on("mouseup", function(e)
     {
         if ($(e.target).filter("#canvas").length > 0)
         {
             select(null);
             var newBox = $('<input type="text"/>').css("position", "absolute")
-                                     .css("left", e.pageX - $(e.target).position().left - 10)
-                                     .css("top", e.pageY - $(e.target).position().top - 10)
+                                     .css("left", e.pageX - $(e.target).position().left - parseFloat($("#canvas").css("font-size")) / 2)
+                                     .css("top", e.pageY - $(e.target).position().top - parseFloat($("#canvas").css("font-size")) / 2)
                                      .css("width", $("#canvas").css("font-size"))
                                      .css("height", $("#canvas").css("font-size"))
                                      .css("text-align", "center")
@@ -101,37 +102,25 @@ function commitNew(box)
         box.remove();
         return;
     }
+    if (!isNumber(val) && val.length != 1)
+    {
+        console.error("Invalid input");
+        box.remove();
+        return;
+    }
     
     switch(val)
     {
         case "/":
-            var newSym = genFrac(box.css("left"), box.css("top"), 40);
+            var newSym = genFrac(parseFloat(box.css("left")) + box.width() / 2, parseFloat(box.css("top")) + box.height() / 2, 40);
             newSym.data("token", ":frac");
             newSym.data("type", "type/symbol");
             
             break;
         default:
-            var newSym = genSym(val, box.css("left"), box.css("top"));
-            
+            var newSym = genSym(val, parseFloat(box.css("left")) + box.width()/2, parseFloat(box.css("top")) + box.height()/2);
             newSym.data("token", val);
-            console.log(newSym);
-            if (isNumber(val))
-            {
-                newSym.data("type", "type/symbol");
-            }
-            else if (val.length == 1)
-            {
-                if (symbols.indexOf(val) > -1)
-                    newSym.data("type", "type/symbol");
-                else
-                    newSym.data("type", "type/symbol");
-            }
-            else
-            {
-                console.error("Invalid input");
-                box.remove();
-                return;
-            }
+            newSym.data("type", "type/symbol");
             break;
     }
     
@@ -140,20 +129,35 @@ function commitNew(box)
     box.remove();
 }
 
-function genFrac(left, top, width)
+function genFrac(x, y, width)
 {
     var newSym = $('<canvas/>').addClass("symbol");
-    newSym.css("left",left);
-    newSym.css("top", top);
+    newSym.css("left",x - width /2);
+    newSym.css("top", y);
     newSym.css("width", width);
     
     newSym.css("background", "black");
-    newSym.css("height", Math.max(1, width / 30));
+    newSym.css("height", Math.max(1, width / fracAspectRatio));
+    
+    newSym.on("mousewheel", function(e)
+    {
+        var oldWidth = newSym.width();
+        if (e.originalEvent.wheelDelta > 0)
+            newSym.width(newSym.width() * 1.1);
+        else
+            newSym.width(newSym.width() / 1.1);
+        
+        newSym.height(newSym.width() / fracAspectRatio);
+        newSym.css("left", parseFloat(newSym.css("left")) - (newSym.width() - oldWidth)/2);
+        parse();
+        e.preventDefault();
+        return false;
+    });
     
     return newSym;
 }
 
-function genSym(v,left,top)
+function genSym(v,x,y)
 {
     if (!endsWith($("#canvas").css("font-size"), "px"))
     {
@@ -164,17 +168,38 @@ function genSym(v,left,top)
     var fontSize = parseFloat($("#canvas").css("font-size"));
     var bounds = measureText(v, $("#canvas").css("font"), fontSize, fontSize * 2);
     
-    var newSym = $('<canvas/>').addClass("symbol");
+    var newSym = $('<div/>').addClass("symbol")
+                            .width(bounds.width)
+                            .height(bounds.height)
+                            .append($("<div/>").css("position", "absolute")
+                                               .css("left", -bounds.left)
+                                               .css("top", -bounds.top)
+                                               .html(v));
     
-    setCanvasSize(newSym, bounds.width, bounds.height);
+    newSym.css("left",x - bounds.width/2);
+    newSym.css("top", y - bounds.height/2);
     
-    var ctx = newSym[0].getContext("2d");
-    ctx.textBaseline = "top";
-    ctx.font = $("#canvas").css("font");
-    ctx.fillText(v, -bounds.left,-bounds.top);
-    
-    newSym.css("left",left);
-    newSym.css("top", top);
+    newSym.on("mousewheel", function(e)
+    {
+        var oldWidth = newSym.width();
+        var oldHeight = newSym.height();
+        if (e.originalEvent.wheelDelta > 0)
+            var fontSize = parseFloat(newSym.css("font-size")) * 1.1;
+        else
+            var fontSize = parseFloat(newSym.css("font-size")) / 1.1;
+            
+        newSym.css("font-size", fontSize + "px");
+        var bounds = measureText(v, newSym.css("font"), fontSize, fontSize * 2);
+        newSym.width(bounds.width);
+        newSym.height(bounds.height);
+        newSym.find("div").css("left", -bounds.left)
+                          .css("top", -bounds.top);
+        newSym.css("left", parseFloat(newSym.css("left")) - (newSym.width() - oldWidth)/2);
+        newSym.css("top", parseFloat(newSym.css("top")) - (newSym.height() - oldHeight)/2);
+        parse();
+        e.preventDefault();
+        return false;
+    });
     
     return newSym;
 }
@@ -192,10 +217,11 @@ function endsWith(str, pattern)
 
 function measureText(text, font, maxCharWidth, maxCharHeight)
 {
+
     var c = $("<canvas/>");
     
-    var width = maxCharWidth*text.length;
-    var height = maxCharHeight;
+    var width = Math.ceil(maxCharWidth*text.length);
+    var height = Math.ceil(maxCharHeight);
     
     c.attr("width", width).width(width)
      .attr("height", height).height(height);
