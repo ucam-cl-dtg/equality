@@ -30,28 +30,28 @@
 (defmulti mathml-inner :type)
 
 (defmethod mathml-inner :type/var [expr]
-  (str "<mi>" (:token expr) "</mi>"))
+  (str "<mi id=\"" (:id expr) "\">" (:token expr) "</mi>"))
 
 (defmethod mathml-inner :type/num [expr]
-  (str "<mn>" (:token expr) "</mn>"))
+  (str "<mn id=\"" (:id expr) "\">" (:token expr) "</mn>"))
 
 (defmethod mathml-inner :type/pow [expr]
   (str "<mrow><msup>" (mathml-inner (:base expr)) (mathml-inner (:exponent expr)) "</msup></mrow>"))
 
 (defmethod mathml-inner :type/add [expr]
-  (str "<mrow>" (mathml-inner (:left-op expr)) "<mo>+</mo>" (mathml-inner (:right-op expr)) "</mrow>"))
+  (str "<mrow>" (mathml-inner (:left-op expr)) "<mo id=\"" (:id expr) "\">+</mo>" (mathml-inner (:right-op expr)) "</mrow>"))
 
 (defmethod mathml-inner :type/sub [expr]
-  (str "<mrow>" (mathml-inner (:left-op expr)) "<mo>-</mo>" (mathml-inner (:right-op expr)) "</mrow>"))
+  (str "<mrow>" (mathml-inner (:left-op expr)) "<mo id=\"" (:id expr) "\">-</mo>" (mathml-inner (:right-op expr)) "</mrow>"))
 
 (defmethod mathml-inner :type/mult [expr]
   (str "<mrow>" (mathml-inner (:left-op expr)) (mathml-inner (:right-op expr)) "</mrow>"))
 
 (defmethod mathml-inner :type/eq [expr]
-  (str "<mrow>" (mathml-inner (:left-op expr)) "<mo>=</mo>" (mathml-inner (:right-op expr)) "</mrow>"))
+  (str "<mrow>" (mathml-inner (:left-op expr)) "<mo id=\"" (:id expr) "\">=</mo>" (mathml-inner (:right-op expr)) "</mrow>"))
 
 (defmethod mathml-inner :type/frac [expr]
-  (str "<mfrac><mrow>" (mathml-inner (:numerator expr)) "</mrow><mrow>" (mathml-inner (:denominator expr)) "</mrow></mfrac>"))
+  (str "<mfrac id=\"" (:id expr) "\"><mrow>" (mathml-inner (:numerator expr)) "</mrow><mrow>" (mathml-inner (:denominator expr)) "</mrow></mfrac>"))
 
 (defn mathml [expr]
   (str "<math display=\"block\"><mrow>" (mathml-inner expr) "</mrow></math>"))

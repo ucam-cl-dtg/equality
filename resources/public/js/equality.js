@@ -9,6 +9,8 @@ var inputBox = null;
 var symbols = ["+", "-", "="];
 var fracAspectRatio = 100;
 
+var nextSymbolId = 0;
+
 $(function ()
 {
    // Document ready
@@ -36,17 +38,22 @@ $(function ()
                                      .css("left", e.pageX - $(e.target).position().left - parseFloat($("#canvas").css("font-size")) / 2)
                                      .css("top", e.pageY - $(e.target).position().top - parseFloat($("#canvas").css("font-size")) / 2)
                                      .css("width", $("#canvas").css("font-size"))
-                                     .css("height", $("#canvas").css("font-size"))
-                                     .css("text-align", "center")
+                                     //.css("height", $("#canvas").css("font-size"))
+                                     .css("text-align", "left")
+									 .css("padding-left", parseFloat($("#canvas").css("font-size")) / 2)
                                      .css("font", $("#canvas").css("font"))
+									 .css("background", "rgba(255,255,255,0.6)")
                                      .appendTo($("#canvas"))
                                      .blur(function(e) { commitNew(newBox); })
-                                     .keydown(function(e)
+                                     .keyup(function(e)
                                      {
+										console.log(e);
                                         if (e.which == 13) // enter
                                             commitNew(newBox);
                                         else if (e.which == 27) // escape
                                             newBox.remove();
+										else
+											autoSize(newBox);
                                      });
             newBox.focus();
             e.preventDefault();
@@ -87,6 +94,20 @@ $(function ()
     });
 
 });
+
+function autoSize(box)
+{
+	console.log(box.width(), box.val());
+	var d = $("<div/>").html(box.val())
+	                   .css("font", box.css("font"))
+					   .css("display", "inline-block");
+	$("body").append(d);
+	console.log("D", d.width());
+	box.width(d.width() + 30);
+	console.log(box.width());
+	d.remove();
+	
+}
 
 function isNumber(n) {
   return !isNaN(parseFloat(n)) && isFinite(n);
@@ -131,13 +152,14 @@ function commitNew(box)
 
 function genFrac(x, y, width)
 {
-    var newSym = $('<canvas/>').addClass("symbol");
+    var newSym = $('<canvas/>').addClass("symbol").addClass("frac");
     newSym.css("left",x - width /2);
     newSym.css("top", y);
     newSym.css("width", width);
     
-    newSym.css("background", "black");
     newSym.css("height", Math.max(1, width / fracAspectRatio));
+	newSym.attr("data-eq-id", "eqsym" + nextSymbolId++);
+	
     
     newSym.on("mousewheel", function(e)
     {
@@ -178,7 +200,10 @@ function genSym(v,x,y)
     
     newSym.css("left",x - bounds.width/2);
     newSym.css("top", y - bounds.height/2);
-    
+	newSym.attr("data-eq-id", "eqsym" + nextSymbolId++);
+	
+	nextSymbolId++;
+	
     newSym.on("mousewheel", function(e)
     {
         var oldWidth = newSym.width();
@@ -278,6 +303,7 @@ function parse()
     console.log("Parse!");
     var symbols = $("#canvas .symbol");
     objs = [];
+	var id = 13;
     symbols.each(function(i,s)
     {
         var obj = {token: $(s).data("token"),
@@ -285,6 +311,7 @@ function parse()
                    left: $(s).position().left,
                    width: $(s).width(),
                    height: $(s).height(),
+				   id: $(s).data("eqId"),
                    type: $(s).data("type")};
                    
         if ($(s).data("prec"))
@@ -294,6 +321,7 @@ function parse()
         
         objs.push(obj);
     });
+	
     
     console.log(objs);
     
@@ -301,10 +329,21 @@ function parse()
             method: "post",
             contentType: "application/json",
             data: JSON.stringify(objs),
+			dataType: "json",
             success: function(data)
                 {
                     console.log("Return:", data);
-                    $("#output").html(data);
+                    $("#output").html(data.mathml);
+					$(".symbol").removeClass("unused");
+					for (var i in data.unusedSymbols)
+					{
+						$(".symbol[data-eq-id=\"" + data.unusedSymbols[i] + "\"]").addClass("unused");
+					}
+					for (var i in data.overlap)
+					{
+						$(".symbol[data-eq-id=\"" + data.unusedSymbols[i] + "\"]").addClass("overlap");
+					}
+					
                     MathJax.Hub.Queue(["Typeset",MathJax.Hub,"output"]);
                 },
             error: function(e)
@@ -314,3 +353,5 @@ function parse()
                 }
             });
 }
+
+

@@ -47,13 +47,34 @@
     border: 1px solid rgba(180,0,0,0.8);
 }
 
+
+.symbol.unused
+{
+	color: red;
+}
+
+.symbol.overlap
+{
+	color: #008;
+}
+
 .frac {
-    background-color: #333;
+    background-color: #000;
+}
+
+.frac.unused
+{
+	background-color: #f00;
+}
+
+.frac.overlap
+{
+	background-color: #008;
 }
 
 input
 {
-
+	border: none;
 }
 
 div {
