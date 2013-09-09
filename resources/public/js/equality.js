@@ -16,11 +16,26 @@ var resizing = false;
 
 $(function ()
 {
+    $("#instructions").css("top", $("#canvas").height()/2 - $("#instructions").height()/2);
+    $("#instructions").css("left", $("#canvas").width()/2 - $("#instructions").width()/2);
+    
+    $("#instructionsOutput").css("top", $("#output").height()/2 - $("#instructionsOutput").height()/2);
+    $("#instructionsOutput").css("left", $("#output").width()/2 - $("#instructionsOutput").width()/2);
    // Document ready
+    $("body").on("mousedown", function(e)
+    {
+        $("#instructions").fadeOut();
+    });
     
     $("body").on("click", "button.parse", function(e)
     {
         parse();
+    });
+    
+    $("#canvas").on("contextmenu", function(e)
+    {
+        e.preventDefault();
+        return false;
     });
 	
     $("#canvas").on("mousedown", ".symbol .handle", function(e)
@@ -44,25 +59,27 @@ $(function ()
     
 	$("#canvas").on("mousedown", function(e)
 	{
+        console.log("cmd");
         if ($(e.target).filter("#canvas").length > 0)
         {
-			groupBox = $("<div/>").addClass("groupBox")
-			                      .css("top", e.pageY)
-								  .css("left", e.pageX)
-								  .data("pinX", e.pageX)
-								  .data("pinY", e.pageY)
-								  .width(0)
-								  .height(0).mouseup(groupBoxMouseUp)
-								  .mousemove(function(ev)
-								  {
-									setGroupBoxCorner(ev.pageX, ev.pageY);
-								  }).appendTo($("body"))
+            groupBox = $("<div/>").addClass("groupBox")
+                                  .css("top", e.pageY)
+                                  .css("left", e.pageX)
+                                  .data("pinX", e.pageX)
+                                  .data("pinY", e.pageY)
+                                  .width(0)
+                                  .height(0).mouseup(groupBoxMouseUp)
+                                  .mousemove(function(ev)
+                                  {
+                                    setGroupBoxCorner(ev.pageX, ev.pageY);
+                                  }).appendTo($("body"))
 		}
 	});
 
 	
     $("#canvas").on("mouseup", function(e)
     {
+        console.log($(e.target));
 		resizing = false;
 		if (groupBox)
 		{
@@ -72,16 +89,24 @@ $(function ()
 		{
 			dragStartPos = null;
 			draggingSymbolStartPos = null;
+            parse();
 		}
-        else if ($(e.target).filter("#canvas").length > 0 || $(e.target).filter(".groupBox").length > 0)
+        else if ($(e.target).filter("#canvas").length > 0 || $(e.target).filter(".groupBox").length > 0 || $(e.target).closest("#instructions").length > 0)
         {
-            select(null);
-			createInputBox(e.pageX - $("#canvas").position().left, e.pageY - $("#canvas").position().top);
-            e.preventDefault();
-            return false;
+            if (e.which == 3)
+            {
+                commitNewVal(e.pageX- $("#canvas").position().left - 20, e.pageY- $("#canvas").position().top, "/");
+                parse();
+            }
+            else
+            {
+                select(null);
+                createInputBox(e.pageX - $("#canvas").position().left, e.pageY - $("#canvas").position().top);
+            }
+            //e.preventDefault();
+            //return false;
         }
 		
-        parse();
     });
       
     $("#canvas").on("click", function(e)
@@ -302,7 +327,7 @@ function commitNew(box)
     for (var i = 0; i < vals.length; i++)
     {
         console.log("Adding val", vals[i]);
-        var newSym = commitNewVal(xAcc + parseFloat(box.css("left")) + 20, parseFloat(box.css("top")) + box.height() / 2, vals[i]);
+        var newSym = commitNewVal(xAcc + parseFloat(box.css("left"))+10, parseFloat(box.css("top")) + box.height() / 2, vals[i]);
         xAcc += newSym.width();
     }
     
@@ -535,6 +560,7 @@ function parse()
 					}
 					
                     MathJax.Hub.Queue(["Typeset",MathJax.Hub,"output"]);
+                    $("#instructionsOutput").fadeOut();
                 },
             error: function(e)
                 {

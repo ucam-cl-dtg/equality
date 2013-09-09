@@ -89,24 +89,18 @@
     (include-js "js/equality.js")]
    [:body [:h1 "Equality"]
     [:div#canvas
-     #_(for [i test-input]
-       [:div (merge
-              {:style (str "left:" (:left i)
-                           "px;top:" (:top i)
-                           "px;width:" (:width i)
-                           "px;height:" (:height i)
-                           "px;line-height:" (:height i)
-                           "px;font-size:" (:height i)
-                           "px;")
-               :data-type (str (namespace (:type i)) "/" (name (:type i)))
-               :data-token (str (:token i))
-               :class "symbol"}
-              (when (keyword? (:token i))
-                {:class (str "symbol " (name (:token i)))})
-              (when (:prec i)
-                {:data-prec (:prec i)})) (render-thing i)])]
+      [:div#instructions 
+        "To get started, click anywhere on this canvas and type a simple expression, such as \"1+2x=5\""
+        [:p]
+        "Click on symbols to move them around or resize them."
+        [:p]
+        "Right click to add a fraction"
+        [:p]
+        "Arrange your equation as you would on paper"]]
     [:button.parse {:type :button} "Parse"]
-    [:div#output]]))
+    [:div#output
+    [:div#instructionsOutput
+    "Parsed equations will appear here."]]]))
 
 (defroutes app-routes
   (GET "/" [] (home-page))

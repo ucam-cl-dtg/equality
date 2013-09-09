@@ -1,3 +1,23 @@
+#instructions
+{
+    font-family: sans-serif;
+    font-style: italic;
+    opacity: 0.2;
+    text-align:center;
+    position:absolute;
+    width: 90%;
+}
+
+#instructionsOutput
+{
+    font-family: sans-serif;
+    font-style: italic;
+    opacity: 0.2;
+    text-align:center;
+    position:absolute;
+    width: 90%;
+}
+
 #canvas
 {
     position:absolute;
@@ -14,7 +34,7 @@
 #output
 {
     position: absolute;
-    left: 630px;
+    left: 520px;
     top: 100px;
     width: 500px;
     height: 500px;
@@ -32,6 +52,7 @@
     top: 100px;
     width: 100px;
     height: 100px;
+    display:none;
 }
 
 .symbol
