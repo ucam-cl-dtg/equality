@@ -263,14 +263,18 @@ function commitNew(box)
 
 function genFrac(x, y, width)
 {
-    var newSym = $('<canvas/>').addClass("symbol").addClass("frac");
+    var newSym = $('<div/>').addClass("symbol").addClass("frac");
     newSym.css("left",x - width /2);
     newSym.css("top", y);
     newSym.css("width", width);
     
     newSym.css("height", Math.max(1, width / fracAspectRatio));
 	newSym.attr("data-eq-id", "eqsym" + nextSymbolId++);
-	
+	newSym.append($("<div/>").height(16)
+						     .css("left",0)
+							 .css("top",-8 + newSym.height() / 2)
+	                         .addClass("fracBackground")
+							 .width(width));
     
     newSym.on("mousewheel", function(e)
     {

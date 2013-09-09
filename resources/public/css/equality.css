@@ -40,11 +40,12 @@
     background: transparent;
     border: 1px dotted rgba(0,0,0,0.0);
     cursor: pointer;
-    overflow: hidden;
+    /*overflow: hidden;*/
+	z-index: 10;
 }
 .symbol.selected
 {
-    border: 1px solid rgba(180,0,0,0.8);
+    outline: 1px dotted rgba(180,0,0,0.8);
 }
 
 
@@ -60,6 +61,8 @@
 
 .frac {
     background-color: #000;
+	z-index: 0;
+	overflow: visible;
 }
 
 .frac.unused
@@ -70,6 +73,11 @@
 .frac.overlap
 {
 	background-color: #008;
+}
+
+.fracBackground
+{
+	position: absolute;
 }
 
 input
