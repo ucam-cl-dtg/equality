@@ -77,7 +77,14 @@ input
 	border: none;
 }
 
-div {
+.groupBox
+{
+	position:absolute;
+	border: 1px solid #00c;
+	background: rgba(0,0,255,0.1);
+}
+
+* {
    -moz-user-select: -moz-none;
    -khtml-user-select: none;
    -webkit-user-select: none;

@@ -1,5 +1,4 @@
 var dragStartPos = null;
-var draggingSymbol = null;
 var draggingSymbolStartPos = null;
 
 var selectedSymbol = null;
@@ -11,32 +10,71 @@ var fracAspectRatio = 100;
 
 var nextSymbolId = 0;
 
+var groupBox = null;
+
 $(function ()
 {
    // Document ready
     
     $("body").on("click", "button.parse", function(e)
     {
+		console.log("body click");
         parse();
     });
-
+	
     $("#canvas").on("mousedown", ".symbol", function(e)
     {
-        //console.log($(e.target).position(), e.pageX, e.pageY);
+        console.log("MD symbol");
+		if (!$(e.target).closest(".symbol").hasClass("selected"))
+		{
+			select([$(e.target).closest(".symbol")]);
+			console.log("DESELECTED", selectedSymbols, $(e.target).closest(".symbol"));
+		}
         dragStartPos = {x: e.pageX, y: e.pageY};
-        draggingSymbolStartPos = $(e.target).closest(".symbol").position();
-        draggingSymbol = $(e.target).closest(".symbol");
-        select($(e.target).closest(".symbol"));
+        //draggingSymbol = $(e.target).closest(".symbol");
+        draggingSymbolStartPos = $(selectedSymbols).map(function() {return $(this).position()});
+		console.log("dssp" ,draggingSymbolStartPos);
     });
     
+	$("#canvas").on("mousedown", function(e)
+	{
+		console.log("mousedown");
+        if ($(e.target).filter("#canvas").length > 0)
+        {
+			groupBox = $("<div/>").addClass("groupBox")
+			                      .css("top", e.pageY)
+								  .css("left", e.pageX)
+								  .data("pinX", e.pageX)
+								  .data("pinY", e.pageY)
+								  .width(0)
+								  .height(0).mouseup(groupBoxMouseUp)
+								  .mousemove(function(ev)
+								  {
+									setGroupBoxCorner(ev.pageX, ev.pageY);
+								  }).appendTo($("body"))
+		}
+	});
+
+	
     $("#canvas").on("mouseup", function(e)
     {
-        if ($(e.target).filter("#canvas").length > 0)
+		console.log("canvas mouseup", $(e.target));
+        
+		if (groupBox)
+		{
+			groupBoxMouseUp(e);
+		}
+		else if (dragStartPos)
+		{
+			dragStartPos = null;
+			draggingSymbolStartPos = null;
+		}
+        else if ($(e.target).filter("#canvas").length > 0 || $(e.target).filter(".groupBox").length > 0)
         {
             select(null);
             var newBox = $('<input type="text"/>').css("position", "absolute")
-                                     .css("left", e.pageX - $(e.target).position().left - parseFloat($("#canvas").css("font-size")) / 2)
-                                     .css("top", e.pageY - $(e.target).position().top - parseFloat($("#canvas").css("font-size")) / 2)
+                                     .css("left", e.pageX - $("#canvas").position().left - parseFloat($("#canvas").css("font-size")) / 2)
+                                     .css("top", e.pageY - $("#canvas").position().top - parseFloat($("#canvas").css("font-size")) / 2)
                                      .css("width", $("#canvas").css("font-size"))
                                      //.css("height", $("#canvas").css("font-size"))
                                      .css("text-align", "left")
@@ -59,27 +97,36 @@ $(function ()
             e.preventDefault();
             return false;
         }
-        
-    });
-  
-    $("#canvas").on("mouseup", function(e)
-    {
-        dragStartPos = null;
-        draggingSymbol = null;
-        draggingSymbolStartPos = null;
+		
         parse();
     });
-    
+      
+    $("#canvas").on("click", function(e)
+	{
+		console.log("click");
+		if (groupBox)
+			groupBox.remove();
+		groupBox = null;
+	});
+	
     $("#canvas").on("mousemove", function(e)
     {
-        if (draggingSymbol)
+		console.log("mousemove");
+        if (dragStartPos)
         {
-            var dx = e.pageX -dragStartPos.x;
+            var dx = e.pageX - dragStartPos.x;
             var dy = e.pageY - dragStartPos.y;
             
-            draggingSymbol.css("left", draggingSymbolStartPos.left + dx);
-            draggingSymbol.css("top", draggingSymbolStartPos.top + dy);
+			for (var i = 0; i < selectedSymbols.length; i++)
+			{
+				selectedSymbols[i].css("left", draggingSymbolStartPos[i].left + dx);
+				selectedSymbols[i].css("top", draggingSymbolStartPos[i].top + dy);
+			}
         }
+		else if (groupBox)
+		{
+			setGroupBoxCorner(e.pageX, e.pageY);
+		}
     });
     
     $("body").on("keydown", function(e)
@@ -94,6 +141,68 @@ $(function ()
     });
 
 });
+
+function setGroupBoxCorner(x, y)
+{
+	var gx = parseFloat(groupBox.css("left"));
+	var gy = parseFloat(groupBox.css("top"));
+	if (x < groupBox.data("pinX"))
+	{
+		groupBox.width(groupBox.data("pinX") - x);
+		groupBox.css("left",x);
+	}
+	else
+	{
+		groupBox.width(x - gx);
+	}
+	
+	if (y < groupBox.data("pinY"))
+	{
+		console.log(groupBox.data("pinY")-y);
+		groupBox.height(groupBox.data("pinY") - y);
+		groupBox.css("top",y);
+	}
+	else
+	{
+		groupBox.height(y-gy);
+	}
+}
+
+function groupBoxMouseUp(ev)
+{
+	if (groupBox.width() == 0 && groupBox.height() == 0)
+	{
+		groupBox.remove();
+		groupBox = null;
+		$("#canvas").trigger(ev);
+		return;
+	}
+	
+	var gTop = parseFloat(groupBox.css("top"));
+	var gLeft = parseFloat(groupBox.css("left"));
+	var gRight = gLeft + groupBox.width();
+	var gBottom = gTop + groupBox.height();
+	var selectedSymbols = [];
+	
+	$(".symbol").filter(function()
+	{
+		var sTop = parseFloat($(this).css("top")) + parseFloat($("#canvas").css("top"));
+		var sLeft = parseFloat($(this).css("left")) + parseFloat($("#canvas").css("left"));
+		var sRight = sLeft + $(this).width();
+		var sBottom = sTop + $(this).height();
+		return sBottom > gTop && sTop < gBottom && sRight > gLeft && sLeft < gRight;
+		
+	}).each(function()
+	{
+		selectedSymbols.push($(this));
+	});
+	
+	select(selectedSymbols);
+	
+	
+	groupBox.remove();
+	groupBox = null;
+}
 
 function autoSize(box)
 {
@@ -286,14 +395,17 @@ function measureText(text, font, maxCharWidth, maxCharHeight)
             height: maxY - minY + 3};
 }
 
-function select(symbol)
+function select(symbols)
 {
     $(".symbol").removeClass("selected");
-    selectedSymbol = null;
-    if (symbol)
+    selectedSymbols = [];
+    if (symbols)
     {
-        symbol.addClass("selected");
-        selectedSymbol = symbol;
+		for(var si in symbols)
+		{
+			symbols[si].addClass("selected");
+			selectedSymbols.push(symbols[si]);
+		}
     }
 }
 
