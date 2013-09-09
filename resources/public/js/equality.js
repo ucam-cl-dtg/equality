@@ -18,27 +18,22 @@ $(function ()
     
     $("body").on("click", "button.parse", function(e)
     {
-		console.log("body click");
         parse();
     });
 	
     $("#canvas").on("mousedown", ".symbol", function(e)
     {
-        console.log("MD symbol");
 		if (!$(e.target).closest(".symbol").hasClass("selected"))
 		{
 			select([$(e.target).closest(".symbol")]);
-			console.log("DESELECTED", selectedSymbols, $(e.target).closest(".symbol"));
 		}
         dragStartPos = {x: e.pageX, y: e.pageY};
-        //draggingSymbol = $(e.target).closest(".symbol");
         draggingSymbolStartPos = $(selectedSymbols).map(function() {return $(this).position()});
 		console.log("dssp" ,draggingSymbolStartPos);
     });
     
 	$("#canvas").on("mousedown", function(e)
 	{
-		console.log("mousedown");
         if ($(e.target).filter("#canvas").length > 0)
         {
 			groupBox = $("<div/>").addClass("groupBox")
@@ -58,7 +53,6 @@ $(function ()
 	
     $("#canvas").on("mouseup", function(e)
     {
-		console.log("canvas mouseup", $(e.target));
         
 		if (groupBox)
 		{
@@ -72,28 +66,7 @@ $(function ()
         else if ($(e.target).filter("#canvas").length > 0 || $(e.target).filter(".groupBox").length > 0)
         {
             select(null);
-            var newBox = $('<input type="text"/>').css("position", "absolute")
-                                     .css("left", e.pageX - $("#canvas").position().left - parseFloat($("#canvas").css("font-size")) / 2)
-                                     .css("top", e.pageY - $("#canvas").position().top - parseFloat($("#canvas").css("font-size")) / 2)
-                                     .css("width", $("#canvas").css("font-size"))
-                                     //.css("height", $("#canvas").css("font-size"))
-                                     .css("text-align", "left")
-									 .css("padding-left", parseFloat($("#canvas").css("font-size")) / 2)
-                                     .css("font", $("#canvas").css("font"))
-									 .css("background", "rgba(255,255,255,0.6)")
-                                     .appendTo($("#canvas"))
-                                     .blur(function(e) { commitNew(newBox); })
-                                     .keyup(function(e)
-                                     {
-										console.log(e);
-                                        if (e.which == 13) // enter
-                                            commitNew(newBox);
-                                        else if (e.which == 27) // escape
-                                            newBox.remove();
-										else
-											autoSize(newBox);
-                                     });
-            newBox.focus();
+			createInputBox(e.pageX - $("#canvas").position().left, e.pageY - $("#canvas").position().top);
             e.preventDefault();
             return false;
         }
@@ -103,7 +76,6 @@ $(function ()
       
     $("#canvas").on("click", function(e)
 	{
-		console.log("click");
 		if (groupBox)
 			groupBox.remove();
 		groupBox = null;
@@ -111,7 +83,6 @@ $(function ()
 	
     $("#canvas").on("mousemove", function(e)
     {
-		console.log("mousemove");
         if (dragStartPos)
         {
             var dx = e.pageX - dragStartPos.x;
@@ -132,15 +103,45 @@ $(function ()
     $("body").on("keydown", function(e)
     {
         console.log(e);
-        if(e.which == 46 && selectedSymbol)
+        if(e.which == 46)
         {
-            console.log(e);
-            selectedSymbol.remove();
+			for(var i = 0; i < selectedSymbols.length; i++)
+				selectedSymbols[i].remove();
             parse();
         }
     });
 
 });
+
+function createInputBox(x,y)
+{
+	var newBox = $('<input type="text"/>').css("position", "absolute")
+							 .css("left", x - parseFloat($("#canvas").css("font-size")) / 2)
+							 .css("top", y - parseFloat($("#canvas").css("font-size")) / 2)
+							 .css("width", $("#canvas").css("font-size"))
+							 .css("text-align", "left")
+							 .css("padding-left", parseFloat($("#canvas").css("font-size")) / 2)
+							 .css("font", $("#canvas").css("font"))
+							 .css("background", "rgba(255,255,255,0.6)")
+							 .appendTo($("#canvas"))
+							 .blur(function(e) { commitNew(newBox); })
+							 .keyup(function(e)
+							 {
+								console.log(e);
+								if (e.which == 13) // enter
+									commitNew(newBox);
+								else if (e.which == 27) // escape
+									newBox.remove();
+								else if (e.which == 32) // space
+								{
+									var newSym = commitNew(newBox);
+									createInputBox(x + newSym.width() + parseFloat($("#canvas").css("font-size")) / 4, y);
+								}
+								else
+									autoSize(newBox);
+							 });
+	newBox.focus();
+}
 
 function setGroupBoxCorner(x, y)
 {
@@ -224,7 +225,7 @@ function isNumber(n) {
 
 function commitNew(box)
 {
-    var val = box[0].value;
+    var val = box[0].value.trim();
     
     if (!val)
     {
@@ -257,6 +258,7 @@ function commitNew(box)
     $("#canvas").append(newSym);
     parse();
     box.remove();
+	return newSym;
 }
 
 function genFrac(x, y, width)

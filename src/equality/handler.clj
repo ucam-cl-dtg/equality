@@ -148,7 +148,7 @@ _              (pprint all-symbols)
 ;;          (pprint unused-symbols)
           (println "***** Parse Results (Least things: " least-things ")*****")
 
-          (pprint (map (fn [i] (cons (str "Orig count: " (:orig-count (meta i)))
+          #_(pprint (map (fn [i] (cons (str "Orig count: " (:orig-count (meta i)))
                                     (cons (str "New count: " (count i))
                                           (cons (str "Orig symbols: " (:orig-symbol-count (meta i)))
                                                 (cons (str "New symbols: " (apply + (map :symbol-count i)))
