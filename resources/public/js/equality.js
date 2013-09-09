@@ -264,46 +264,77 @@ function isNumber(n) {
 }
 
 function commitNew(box)
-{
+{/*
     var val = box[0].value.trim();
     
-    if (!val)
-    {
-        console.error("No input provided");
-        box.remove();
-        return;
-    }
     if (!isNumber(val) && val.length != 1)
     {
         console.error("Invalid input");
         box.remove();
         return;
+    }*/
+    var str = box[0].value.trim();
+    if (!str)
+    {
+        console.error("No input provided");
+        box.remove();
+        return;
     }
     
+    var acc = str[0];
+    var vals = [];
+    for(var i = 1; i < str.length; i++)
+    {
+        if (isNumber(acc) && (isNumber(str[i]) || str[i] == "."))
+        {
+            acc += str[i];
+        }
+        else
+        {
+            vals.push(acc);
+            acc = str[i];
+        }
+    }
+    if (acc)
+        vals.push(acc);
+    
+    var xAcc = 0;
+    for (var i = 0; i < vals.length; i++)
+    {
+        console.log("Adding val", vals[i]);
+        var newSym = commitNewVal(xAcc + parseFloat(box.css("left")) + 20, parseFloat(box.css("top")) + box.height() / 2, vals[i]);
+        xAcc += newSym.width();
+    }
+    
+    parse();
+    box.remove();
+	return newSym;
+}
+
+function commitNewVal(x, y, val)
+{
     switch(val)
     {
         case "/":
-            var newSym = genFrac(parseFloat(box.css("left")) + box.width() / 2, parseFloat(box.css("top")) + box.height() / 2, 40);
+            var newSym = genFrac(x, y, 40);
             newSym.data("token", ":frac");
             newSym.data("type", "type/symbol");
             break;
         default:
-            var newSym = genSym(val, parseFloat(box.css("left")) + box.width()/2, parseFloat(box.css("top")) + box.height()/2);
+            var newSym = genSym(val, x, y);
             newSym.data("token", val);
             newSym.data("type", "type/symbol");
             break;
     }
     newSym.append($("<div/>").addClass("handle"));
     $("#canvas").append(newSym);
-    parse();
-    box.remove();
-	return newSym;
+    return newSym;
 }
 
 function genFrac(x, y, width)
 {
     var newSym = $('<div/>').addClass("symbol").addClass("frac");
-    newSym.css("left",x - width /2);
+    newSym.css("left",x);
     newSym.css("top", y);
     newSym.css("width", width);
     
@@ -354,7 +385,7 @@ function genSym(v,x,y)
 																   .css("top", -bounds.top)
 																   .html(v)));
     
-    newSym.css("left",x - bounds.width/2);
+    newSym.css("left",x);
     newSym.css("top", y - bounds.height/2);
 	newSym.attr("data-eq-id", "eqsym" + nextSymbolId++);
 	newSym.data("token", v);
