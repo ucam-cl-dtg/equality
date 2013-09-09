@@ -1,5 +1,6 @@
 var dragStartPos = null;
 var draggingSymbolStartPos = null;
+var startSize = null;
 
 var selectedSymbol = null;
 
@@ -11,6 +12,7 @@ var fracAspectRatio = 100;
 var nextSymbolId = 0;
 
 var groupBox = null;
+var resizing = false;
 
 $(function ()
 {
@@ -21,14 +23,22 @@ $(function ()
         parse();
     });
 	
+    $("#canvas").on("mousedown", ".symbol .handle", function(e)
+    {
+		console.log("mousedown .handle");
+		resizing = true;
+	});
+	
     $("#canvas").on("mousedown", ".symbol", function(e)
     {
+		console.log("mousedown .symbol");
 		if (!$(e.target).closest(".symbol").hasClass("selected"))
 		{
 			select([$(e.target).closest(".symbol")]);
 		}
         dragStartPos = {x: e.pageX, y: e.pageY};
         draggingSymbolStartPos = $(selectedSymbols).map(function() {return $(this).position()});
+        startSize = $(selectedSymbols).map(function() {return {width: $(this).width(), height: parseFloat($(this).css("font-size"))};});
 		console.log("dssp" ,draggingSymbolStartPos);
     });
     
@@ -53,7 +63,7 @@ $(function ()
 	
     $("#canvas").on("mouseup", function(e)
     {
-        
+		resizing = false;
 		if (groupBox)
 		{
 			groupBoxMouseUp(e);
@@ -85,13 +95,43 @@ $(function ()
     {
         if (dragStartPos)
         {
-            var dx = e.pageX - dragStartPos.x;
-            var dy = e.pageY - dragStartPos.y;
-            
-			for (var i = 0; i < selectedSymbols.length; i++)
+			var dx = e.pageX - dragStartPos.x;
+			var dy = e.pageY - dragStartPos.y;
+			
+			if (resizing)
 			{
-				selectedSymbols[i].css("left", draggingSymbolStartPos[i].left + dx);
-				selectedSymbols[i].css("top", draggingSymbolStartPos[i].top + dy);
+				for (var i = 0; i < selectedSymbols.length; i++)
+				{
+					if(selectedSymbols[i].data("token") == ":frac")
+					{
+						if (startSize[i].width + dx > 10)
+						{
+							selectedSymbols[i].width(startSize[i].width + dx);
+							selectedSymbols[i].height((startSize[i].width + dx) / fracAspectRatio);
+						}
+					}
+					else 
+					{
+						if (startSize[i].height + dy > 5)
+						{
+							selectedSymbols[i].css("font-size", startSize[i].height + dy);
+							var bounds = measureText(selectedSymbols[i].data("token"), selectedSymbols[i].css("font"), startSize[i].height + dy, (startSize[i].height + dy) * 2);
+							selectedSymbols[i].width(bounds.width);
+							selectedSymbols[i].height(bounds.height);
+							selectedSymbols[i].find("div.content").css("top", -bounds.top)
+														  .css("left", -bounds.left)
+														  
+						}
+					}
+				}
+			}
+			else
+			{
+				for (var i = 0; i < selectedSymbols.length; i++)
+				{
+					selectedSymbols[i].css("left", draggingSymbolStartPos[i].left + dx);
+					selectedSymbols[i].css("top", draggingSymbolStartPos[i].top + dy);
+				}
 			}
         }
 		else if (groupBox)
@@ -246,7 +286,6 @@ function commitNew(box)
             var newSym = genFrac(parseFloat(box.css("left")) + box.width() / 2, parseFloat(box.css("top")) + box.height() / 2, 40);
             newSym.data("token", ":frac");
             newSym.data("type", "type/symbol");
-            
             break;
         default:
             var newSym = genSym(val, parseFloat(box.css("left")) + box.width()/2, parseFloat(box.css("top")) + box.height()/2);
@@ -254,7 +293,7 @@ function commitNew(box)
             newSym.data("type", "type/symbol");
             break;
     }
-    
+    newSym.append($("<div/>").addClass("handle"));
     $("#canvas").append(newSym);
     parse();
     box.remove();
@@ -273,10 +312,10 @@ function genFrac(x, y, width)
 	newSym.append($("<div/>").height(16)
 						     .css("left",0)
 							 .css("top",-8 + newSym.height() / 2)
-	                         .addClass("fracBackground")
-							 .width(width));
-    
-    newSym.on("mousewheel", function(e)
+	                         .addClass("fracBackground"));
+    newSym.data("token", ":frac");
+	
+    /*newSym.on("mousewheel", function(e)
     {
         var oldWidth = newSym.width();
         if (e.originalEvent.wheelDelta > 0)
@@ -289,7 +328,7 @@ function genFrac(x, y, width)
         parse();
         e.preventDefault();
         return false;
-    });
+    });*/
     
     return newSym;
 }
@@ -308,17 +347,19 @@ function genSym(v,x,y)
     var newSym = $('<div/>').addClass("symbol")
                             .width(bounds.width)
                             .height(bounds.height)
-                            .append($("<div/>").css("position", "absolute")
-                                               .css("left", -bounds.left)
-                                               .css("top", -bounds.top)
-                                               .html(v));
+                            .append($("<div/>").addClass("contentOuter")
+							                   .append ($("<div/>").addClass("content")
+							                                       .css("position", "absolute")
+                                                                   .css("left", -bounds.left)
+																   .css("top", -bounds.top)
+																   .html(v)));
     
     newSym.css("left",x - bounds.width/2);
     newSym.css("top", y - bounds.height/2);
 	newSym.attr("data-eq-id", "eqsym" + nextSymbolId++);
-	
+	newSym.data("token", v);
 	nextSymbolId++;
-	
+	/*
     newSym.on("mousewheel", function(e)
     {
         var oldWidth = newSym.width();
@@ -340,7 +381,7 @@ function genSym(v,x,y)
         e.preventDefault();
         return false;
     });
-    
+    */
     return newSym;
 }
 
