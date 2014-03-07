@@ -1,5 +1,4 @@
-(ns equality.geometry
-  (:use [clojure.pprint]))
+(ns equality.geometry)
 
 ;; Lines are {:x :y :dx :dy}
 ;; Boxes are {:left :top :width :height}
@@ -46,7 +45,7 @@
         r l1
         s l2
         cross-rs (cross r s)]
-    (when (not= (float cross-rs) 0.0)
+    (when (not= cross-rs 0.0)
       (let [t (/ (cross (v- q p) s) cross-rs)
             u (/ (cross (v- q p) r) cross-rs)]
         (and (>= t 0)

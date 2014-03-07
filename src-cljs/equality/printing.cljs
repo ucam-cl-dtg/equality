@@ -1,5 +1,4 @@
-(ns equality.printing
-  (:use [clojure.pprint]))
+(ns equality.printing)
 
 (defmulti expr-str :type)
 
@@ -25,7 +24,7 @@
   (str "(" (expr-str (:numerator expr)) ") / (" (expr-str (:denominator expr)) ")"))
 
 (defn print-expr [expr]
-  (pprint (expr-str expr)))
+  (js/console.log (expr-str expr)))
 
 (defmulti mathml-inner :type)
 

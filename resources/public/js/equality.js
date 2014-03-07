@@ -539,7 +539,25 @@ function parse()
 	
     
     console.log(objs);
+
+    var data = equality.parser.get_best_results(objs);
+
+    console.log("Return:", data);
+    $("#output").html(data.mathml);
+    $(".symbol").removeClass("unused");
+    for (var i in data.unusedSymbols)
+    {
+        $(".symbol[data-eq-id=\"" + data.unusedSymbols[i] + "\"]").addClass("unused");
+    }
+    for (var i in data.overlap)
+    {
+        $(".symbol[data-eq-id=\"" + data.unusedSymbols[i] + "\"]").addClass("overlap");
+    }
     
+    MathJax.Hub.Queue(["Typeset",MathJax.Hub,"output"]);
+    $("#instructionsOutput").fadeOut();
+   
+    /*
     $.ajax({url: "parse", 
             method: "post",
             contentType: "application/json",
@@ -567,7 +585,7 @@ function parse()
                     console.error(e);
                     $("#output").html("");
                 }
-            });
+            });*/
 }
 
 
