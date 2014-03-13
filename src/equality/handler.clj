@@ -28,11 +28,9 @@
    [:body [:h1 "Equality"]
     [:div#canvas
       [:div#instructions
-        "To get started, click anywhere on this canvas and type a simple expression, such as \"1+2x=5\""
+        "To get started, drag some symbols onto the canvas and arrange them into an equation."
         [:p]
-        "Click on symbols to move them around or resize them."
-        [:p]
-        "Right click to add a fraction"
+        "Alternatively, click anywhere and type a simple expression, such as \"1+2x=5\""
         [:p]
         "Arrange your equation as you would on paper"]]
     [:button.parse {:type :button} "Parse"]

@@ -59,7 +59,7 @@ $(function ()
     
 	$("#canvas").on("mousedown", function(e)
 	{
-        console.log("cmd");
+        console.log("MouseDown", e.target);
         if ($(e.target).filter("#canvas").length > 0)
         {
             groupBox = $("<div/>").addClass("groupBox")
@@ -79,7 +79,7 @@ $(function ()
 	
     $("#canvas").on("mouseup", function(e)
     {
-        console.log($(e.target));
+        console.log("MouseUp", e.target);
 		resizing = false;
 		if (groupBox)
 		{
@@ -167,7 +167,7 @@ $(function ()
     
     $("body").on("keydown", function(e)
     {
-        console.log(e);
+        console.log("KeyDown", e.which);
         if(e.which == 46)
         {
 			for(var i = 0; i < selectedSymbols.length; i++)
@@ -175,6 +175,13 @@ $(function ()
             parse();
         }
     });
+
+    $("#output").html('<math display="block"><mrow><mrow><mn id="eqsym0">34</mn><mi id="eqsym2">x</mi></mrow></mrow></math>');
+    MathJax.Hub.Queue(["Typeset",MathJax.Hub,"output"]);
+
+
+    for(var i = 0; i < 10; i++)
+        commitNewVal(100 + (50*i), 50, i + "");
 
 });
 
@@ -186,24 +193,36 @@ function createInputBox(x,y)
 							 .css("width", $("#canvas").css("font-size"))
 							 .css("text-align", "left")
 							 .css("padding-left", parseFloat($("#canvas").css("font-size")) / 2)
-							 .css("font", $("#canvas").css("font"))
+                             .css("font", $("#canvas").css("font"))
+							 .css("font-family", "MathJax_Main")
 							 .css("background", "rgba(255,255,255,0.6)")
 							 .appendTo($("#canvas"))
 							 .blur(function(e) { commitNew(newBox); })
 							 .keyup(function(e)
 							 {
-								console.log(e);
-								if (e.which == 13) // enter
+								if (e.which == 13) { // enter
 									commitNew(newBox);
-								else if (e.which == 27) // escape
+                                }
+								else if (e.which == 27) { // escape
 									newBox.remove();
-								else if (e.which == 32) // space
-								{
+                                }
+								else if (e.which == 32) { // space
 									var newSym = commitNew(newBox);
 									createInputBox(x + newSym.width() + parseFloat($("#canvas").css("font-size")) / 4, y);
 								}
-								else
-									autoSize(newBox);
+								else {
+
+                                    var code = newBox.val().charCodeAt(0);
+                                    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) {
+                                        newBox.css("font-family", "MathJax_Math");
+                                        newBox.css("font-style", "italic");
+                                    } else {
+                                        newBox.css("font-family", "MathJax_Main");
+                                        newBox.css("font-style", "");
+                                    }
+
+                                    autoSize(newBox);                                    
+                                }
 							 });
 	newBox.focus();
 }
@@ -224,7 +243,6 @@ function setGroupBoxCorner(x, y)
 	
 	if (y < groupBox.data("pinY"))
 	{
-		console.log(groupBox.data("pinY")-y);
 		groupBox.height(groupBox.data("pinY") - y);
 		groupBox.css("top",y);
 	}
@@ -272,16 +290,14 @@ function groupBoxMouseUp(ev)
 
 function autoSize(box)
 {
-	console.log(box.width(), box.val());
 	var d = $("<div/>").html(box.val())
 	                   .css("font", box.css("font"))
-					   .css("display", "inline-block");
+					   .css("display", "none");
 	$("body").append(d);
-	console.log("D", d.width());
+
 	box.width(d.width() + 30);
-	console.log(box.width());
+
 	d.remove();
-	
 }
 
 function isNumber(n) {
@@ -289,19 +305,11 @@ function isNumber(n) {
 }
 
 function commitNew(box)
-{/*
-    var val = box[0].value.trim();
-    
-    if (!isNumber(val) && val.length != 1)
-    {
-        console.error("Invalid input");
-        box.remove();
-        return;
-    }*/
+{
     var str = box[0].value.trim();
     if (!str)
     {
-        console.error("No input provided");
+        // The input box was empty. Guess they didn't want to type anything after all.
         box.remove();
         return;
     }
@@ -396,11 +404,26 @@ function genSym(v,x,y)
         console.error("Canvas font size must be specified in px.");
         return;
     }
+
+    var code = v.charCodeAt(0);
+
+    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122)) {
+        var fontFamily = "MathJax_Math";
+        var fontStyle = "italic";
+    } else {
+        var fontFamily = "MathJax_Main";
+        var fontStyle = "";
+    }
+
+    var tmpDiv = $("<div/>").css("font-family", fontFamily).css("font-style", fontStyle).css("display", "none").appendTo($("#canvas"));
+    var font = $(tmpDiv).css("font");
+    tmpDiv.remove();
     
     var fontSize = parseFloat($("#canvas").css("font-size"));
-    var bounds = measureText(v, $("#canvas").css("font"), fontSize, fontSize * 2);
+    var bounds = measureText(v, font, fontSize, fontSize * 2);
     
     var newSym = $('<div/>').addClass("symbol")
+                            .css("font", font)
                             .width(bounds.width)
                             .height(bounds.height)
                             .append($("<div/>").addClass("contentOuter")
@@ -415,29 +438,7 @@ function genSym(v,x,y)
 	newSym.attr("data-eq-id", "eqsym" + nextSymbolId++);
 	newSym.data("token", v);
 	nextSymbolId++;
-	/*
-    newSym.on("mousewheel", function(e)
-    {
-        var oldWidth = newSym.width();
-        var oldHeight = newSym.height();
-        if (e.originalEvent.wheelDelta > 0)
-            var fontSize = parseFloat(newSym.css("font-size")) * 1.1;
-        else
-            var fontSize = parseFloat(newSym.css("font-size")) / 1.1;
-            
-        newSym.css("font-size", fontSize + "px");
-        var bounds = measureText(v, newSym.css("font"), fontSize, fontSize * 2);
-        newSym.width(bounds.width);
-        newSym.height(bounds.height);
-        newSym.find("div").css("left", -bounds.left)
-                          .css("top", -bounds.top);
-        newSym.css("left", parseFloat(newSym.css("left")) - (newSym.width() - oldWidth)/2);
-        newSym.css("top", parseFloat(newSym.css("top")) - (newSym.height() - oldHeight)/2);
-        parse();
-        e.preventDefault();
-        return false;
-    });
-    */
+
     return newSym;
 }
 
