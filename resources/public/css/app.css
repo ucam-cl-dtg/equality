@@ -2,9 +2,18 @@
 	 display: none;
 }
 
-.equation-canvas {
+.equation-editor {
 	width: 100%;
 	height: 100%;
+	background: #f8ffee;
+}
+
+.equation-canvas {
+	position: absolute;
+	left: 80px;
+	right: 80px;
+	top: 80px;
+	bottom: 0px;
     background: #eef8ff;
     font-size: 48px;
 }
@@ -16,9 +25,55 @@
 
 .symbol {
 	position: absolute;
-    background: #fdd;
+/*    background: #fdd;*/
 }
 
 .symbol-content {
 	position: absolute;
+}
+
+.symbol-hit-region {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+	cursor: pointer;
+}
+
+.symbol .selection-outline {
+	position: absolute;
+	left: -5px;
+	top: -5px;
+	right: -5px;
+	bottom: -5px;
+	border: 1px dashed #800;
+}
+
+.selection-box
+{
+	position:absolute;
+	border: 1px solid #00c;
+	background: rgba(0,0,255,0.1);
+}
+
+ul.symbol-menu {
+	position: absolute;
+	list-style-type: none;
+	padding: 0;
+	margin: 0;
+}
+
+ul.symbol-menu li {
+	display: block;
+}
+.symbol-button {
+	position: absolute;
+	cursor: pointer;
+/*	border: 1px solid #850;
+	border-bottom: none;*/
+}
+
+.symbol-button:last-child {
+/*	border-bottom: 1px solid #850;*/
 }

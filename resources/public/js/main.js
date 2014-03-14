@@ -3,13 +3,15 @@ define(function(require) {
 	$ = require("jquery");
 	require("MathJaxConfig");
 
-	EquationCanvas = require("jsx!EquationCanvas");
+	EquationEditor = require("jsx!EquationCanvas");
 
 
 $(function(){
 	console.log("App Loaded.");
+	setTimeout(function() {
 
-	eqCanvas = new EquationCanvas($("#container")[0]);
+	eqCanvas = new EquationEditor($("#container")[0]);
+	}, 1000);
 });	
 
 });
