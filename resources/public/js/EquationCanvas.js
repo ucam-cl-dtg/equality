@@ -4,6 +4,7 @@ define(function(require) {
 
 	var React = require("react");
 
+	React.initializeTouchEvents(true);
 	require("rsvp");
 
 	(function($){
@@ -130,6 +131,18 @@ define(function(require) {
 			return this.props.onMouseMove(e, this.props.key);
 		},
 
+		onTouchStart: function(e) {
+			return this.onMouseDown(e);
+		},
+
+		onTouchEnd: function(e) {
+			return this.onMouseUp(e);
+		},
+
+		onTouchMove: function(e) {
+			return this.onMouseMove(e);
+		},
+
 		render: function() {
 
 			// Select which font to use, depending on the first character of the token.
@@ -165,7 +178,10 @@ define(function(require) {
 					<div className="symbol-hit-region"
 						onMouseDown={this.onMouseDown} 
 						onMouseUp={this.onMouseUp} 
-						onMouseMove={this.onMouseMove} />
+						onMouseMove={this.onMouseMove}
+						onTouchStart={this.onTouchStart}
+						onTouchEnd={this.onTouchEnd}
+						onTouchMove={this.onTouchMove} />
 				</div>
 			);
 		}
@@ -263,9 +279,17 @@ define(function(require) {
 		},
 
 		handleMouseMove: function(e) {
+
+			if (e.changedTouches){
+				e.pageX = e.changedTouches[0].pageX;
+				e.pageY = e.changedTouches[0].pageY;
+			}
+
 			var offset = $(this.getDOMNode()).parent().offset();
 			var x = e.pageX - offset.left
 			var y = e.pageY - offset.top
+
+			console.log(x,y);
 
 			this.setState({
 				width: x - this.props.originX,
@@ -275,17 +299,22 @@ define(function(require) {
 		},
 
 		handleMouseUp: function(e) {
+
 			this.props.onCommit(this.getBounds());
 		},
 
 		componentDidMount: function() {
 			window.addEventListener("mousemove", this.handleMouseMove);
 			window.addEventListener("mouseup", this.handleMouseUp);
+			window.addEventListener("touchmove", this.handleMouseMove);
+			window.addEventListener("touchend", this.handleMouseUp);
 		},
 
 		componentWillUnmount: function() {	
 			window.removeEventListener("mousemove", this.handleMouseMove);
 			window.removeEventListener("mouseup", this.handleMouseUp);
+			window.removeEventListener("touchmove", this.handleMouseMove)
+			window.removeEventListener("touchend", this.handleMouseUp);
 		},
 
 		getBounds: function() {
@@ -376,6 +405,11 @@ define(function(require) {
 
 		canvas_onClick: function(e) {
 
+			if (e.touches){
+				e.pageX = e.touches[0].pageX;
+				e.pageY = e.touches[0].pageY;
+			}
+
 			var offset = $(this.getDOMNode()).offset();
 			var x = e.pageX - offset.left
 			var y = e.pageY - offset.top
@@ -398,11 +432,16 @@ define(function(require) {
 
 		canvas_onMouseDown: function(e) {
 
+			if (e.touches){
+				e.pageX = e.touches[0].pageX;
+				e.pageY = e.touches[0].pageY;
+			}
+
 			var offset = $(this.getDOMNode()).offset();
 			var x = e.pageX - offset.left;
 			var y = e.pageY - offset.top;
 
-			if(e.button === 0) {
+			if(e.button === 0 || e.touches) {
 				this.setState({
 					selectionBox: <SelectionBox originX={x} originY={y} onCommit={this.selection_commit} />
 				});
@@ -415,6 +454,12 @@ define(function(require) {
 		},
 
 		canvas_onMouseUp: function(e) {
+			if (e.changedTouches){
+				console.log(e);
+				e.pageX = e.changedTouches[0].pageX;
+				e.pageY = e.changedTouches[0].pageY;
+			}
+
 			var offset = $(this.getDOMNode()).offset();
 			var x = e.pageX - offset.left;
 			var y = e.pageY - offset.top;
@@ -470,6 +515,10 @@ define(function(require) {
 		},
 
 		symbol_onMouseDown: function(e,k) {
+			if (e.touches){
+				e.screenX = e.touches[0].screenX;
+				e.screenY = e.touches[0].screenY;
+			}
 
 			if(!this.state.symbols[k].props.selected)
 				this.deselectSymbols();
@@ -524,6 +573,8 @@ define(function(require) {
 
 				window.addEventListener("mousemove", this.dragMouseMove);
 				window.addEventListener("mouseup", this.dragMouseUp);
+				window.addEventListener("touchmove", this.dragMouseMove);
+				window.addEventListener("touchend", this.dragMouseUp);
 			}
 
 			// Deal with drag end
@@ -534,11 +585,16 @@ define(function(require) {
 
 				window.removeEventListener("mousemove", this.dragMouseMove);
 				window.removeEventListener("mouseup", this.dragMouseUp);
+				window.removeEventListener("touchmove", this.dragMouseMove);
+				window.removeEventListener("touchend", this.dragMouseUp);
 			}
 		},
 
 		dragMouseMove: function(e) {
-
+			if (e.touches){
+				e.screenX = e.touches[0].screenX;
+				e.screenY = e.touches[0].screenY;
+			}
 			var dx = e.screenX - this.state.dragStartMouseX;
 			var dy = e.screenY - this.state.dragStartMouseY;
 
@@ -549,10 +605,16 @@ define(function(require) {
 				s.props.y = s.props.dragStartY + dy;
 			}
 
+
 			this.forceUpdate();
+			return false;
 		},
 
 		dragMouseUp: function(e) {
+			if (e.changedTouches){
+				e.screenX = e.changedTouches[0].screenX;
+				e.screenY = e.changedTouches[0].screenY;
+			}
 			var dx = e.screenX - this.state.dragStartMouseX;
 			var dy = e.screenY - this.state.dragStartMouseY;
 
@@ -586,7 +648,10 @@ define(function(require) {
 					onClick={this.canvas_onClick}
 					onMouseDown={this.canvas_onMouseDown}
 					onMouseUp={this.canvas_onMouseUp}
-					onMouseMove={this.canvas_onMouseMove}>
+					onMouseMove={this.canvas_onMouseMove}
+					onTouchStart={this.canvas_onMouseDown}
+					onTouchMove={this.canvas_onMouseMove}
+					onTouchEnd={this.canvas_onMouseUp}>
 					{this.state.symbols}
 					{this.state.inputBox}
 					{this.state.selectionBox}
@@ -634,11 +699,12 @@ define(function(require) {
 					}.bind(this);
 
 					var symbol = (
-						<li className="symbol-button" onMouseDown={spawn} ref={"button" + i} style={{
+						<li className="symbol-button" onMouseDown={spawn} onTouchStart={spawn} ref={"button" + i} key={i} style={{
 							left: this.props.orientation == "vertical" ? 0 : this.props.btnSize * i,
 							top: this.props.orientation == "vertical" ? this.props.btnSize * i : 0,
 							width: btnWidth,
 							height: btnHeight,
+
 						}}>
 							<Symbol x={btnWidth/2} y={btnHeight/2} fontSize={this.props.btnSize*0.7} token={this.props.tokens[i]} onMouseMove={nop} onMouseDown={nop} onMouseUp={nop} key={i} ref={"symbol" + i }/>
 						</li>
