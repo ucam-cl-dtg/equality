@@ -119,28 +119,24 @@ define(function(require) {
 
 	var Symbol = React.createClass({
 
-		onMouseDown: function(e) {
-			return this.props.onMouseDown(e, this.props.key);
+		hitRegion_Grab: function(pageX, pageY) {
+			var offset = $(this.getDOMNode()).offset();
+			var x = pageX - offset.left
+			var y = pageY - offset.top
+
+			return this.props.onGrab(x, y, this.props.key);
 		},
 
-		onMouseUp: function(e) {
-			return this.props.onMouseUp(e, this.props.key);
+		hitRegion_MouseDown: function(e) {
+			return this.hitRegion_Grab(e.pageX, e.pageY);
 		},
 
-		onMouseMove: function(e) {
-			return this.props.onMouseMove(e, this.props.key);
-		},
+		hitRegion_TouchStart: function(e) {
 
-		onTouchStart: function(e) {
-			return this.onMouseDown(e);
-		},
+			if (e.touches.length == 1) { // Only process the first touch to appear. No multi-touch nonsense here.
 
-		onTouchEnd: function(e) {
-			return this.onMouseUp(e);
-		},
-
-		onTouchMove: function(e) {
-			return this.onMouseMove(e);
+				return this.hitRegion_Grab(e.touches[0].pageX, e.touches[0].pageY);				
+			}
 		},
 
 		render: function() {
@@ -176,12 +172,8 @@ define(function(require) {
 					</div>
 					<div className="selection-outline" style={{display: this.props.selected ? "block" : "none" }}/>
 					<div className="symbol-hit-region"
-						onMouseDown={this.onMouseDown} 
-						onMouseUp={this.onMouseUp} 
-						onMouseMove={this.onMouseMove}
-						onTouchStart={this.onTouchStart}
-						onTouchEnd={this.onTouchEnd}
-						onTouchMove={this.onTouchMove} />
+						onMouseDown={this.hitRegion_MouseDown} 
+						onTouchStart={this.hitRegion_TouchStart} />
 				</div>
 			);
 		}
@@ -210,7 +202,7 @@ define(function(require) {
 			$(this.getDOMNode()).off("blur");
 		},
 
-		handleChange: function(e) {
+		inputBox_Change: function(e) {
 
 			var d = $("<div/>").html(e.target.value)
 	                .css("font", $(this.getDOMNode()).css("font"))
@@ -228,7 +220,7 @@ define(function(require) {
 			});
 		},
 
-		handleKeyUp: function(e) {
+		inputBox_KeyUp: function(e) {
 			switch(e.which) {
 				case 13:
 					this.commit();
@@ -251,8 +243,8 @@ define(function(require) {
 					className="token-input"
 					ref="inputBox"
 					value={this.state.value}
-					onChange={this.handleChange}
-					onKeyUp={this.handleKeyUp}
+					onChange={this.inputBox_Change}
+					onKeyUp={this.inputBox_KeyUp}
 					onMouseDown={absorbEvent}
 					onMouseUp={absorbEvent}
 					onClick={absorbEvent}
@@ -278,19 +270,8 @@ define(function(require) {
 			};
 		},
 
-		handleMouseMove: function(e) {
-
-			if (e.changedTouches){
-				e.pageX = e.changedTouches[0].pageX;
-				e.pageY = e.changedTouches[0].pageY;
-			}
-
-			var offset = $(this.getDOMNode()).parent().offset();
-			var x = e.pageX - offset.left
-			var y = e.pageY - offset.top
-
-			console.log(x,y);
-
+		window_DragMove: function(x, y) {
+			
 			this.setState({
 				width: x - this.props.originX,
 				height: y - this.props.originY,
@@ -298,23 +279,55 @@ define(function(require) {
 
 		},
 
-		handleMouseUp: function(e) {
+		window_Drop: function() {
 
 			this.props.onCommit(this.getBounds());
 		},
 
+		window_MouseMove: function(e) {
+
+			var offset = $(this.getDOMNode()).parent().offset();
+			var x = e.pageX - offset.left
+			var y = e.pageY - offset.top
+
+			this.window_DragMove(x,y);
+		},
+
+		window_MouseUp: function(e) {
+			this.window_Drop();
+		},
+
+		window_TouchMove: function(e) {
+			if (e.touches.length == 1) {
+
+				var offset = $(this.getDOMNode()).parent().offset();
+				var x = e.touches[0].pageX - offset.left;
+				var y = e.touches[0].pageY - offset.top;
+
+				 this.window_DragMove(x,y);
+			}
+			e.preventDefault();
+			return false;
+		},
+
+		window_TouchEnd: function(e) {
+			if (e.changedTouches.length == 1)
+				this.window_Drop();
+
+		},
+
 		componentDidMount: function() {
-			window.addEventListener("mousemove", this.handleMouseMove);
-			window.addEventListener("mouseup", this.handleMouseUp);
-			window.addEventListener("touchmove", this.handleMouseMove);
-			window.addEventListener("touchend", this.handleMouseUp);
+			window.addEventListener("mousemove", this.window_MouseMove);
+			window.addEventListener("mouseup", this.window_MouseUp);
+			window.addEventListener("touchmove", this.window_TouchMove);
+			window.addEventListener("touchend", this.window_TouchEnd);
 		},
 
 		componentWillUnmount: function() {	
-			window.removeEventListener("mousemove", this.handleMouseMove);
-			window.removeEventListener("mouseup", this.handleMouseUp);
-			window.removeEventListener("touchmove", this.handleMouseMove)
-			window.removeEventListener("touchend", this.handleMouseUp);
+			window.removeEventListener("mousemove", this.window_MouseMove);
+			window.removeEventListener("mouseup", this.window_MouseUp);
+			window.removeEventListener("touchmove", this.window_TouchMove)
+			window.removeEventListener("touchend", this.window_TouchEnd);
 		},
 
 		getBounds: function() {
@@ -346,15 +359,13 @@ define(function(require) {
 		},
 
 		createSymbol: function(x, y, fontSize, token) {
-			return <Symbol onMouseDown={this.symbol_onMouseDown}
-							     onMouseUp={this.symbol_onMouseUp}
-							     onMouseMove={this.symbol_onMouseMove}
-				                 selected={false} 
-				                 token={token} 
-				                 x={x}
-				                 y={y} 
-				                 fontSize={fontSize} 
-				                 key={getNextSymbolKey()}/>;
+			return <Symbol onGrab={this.symbol_Grab}
+						   selected={false} 
+						   token={token} 
+						   x={x}
+						   y={y} 
+						   fontSize={fontSize} 
+						   key={getNextSymbolKey()}/>;
 		},
 
 		input_cancel: function() {
@@ -403,20 +414,7 @@ define(function(require) {
 			return newSym.props.key; // key of new symbol
 		},
 
-		canvas_onClick: function(e) {
-
-			if (e.touches){
-				e.pageX = e.touches[0].pageX;
-				e.pageY = e.touches[0].pageY;
-			}
-
-			var offset = $(this.getDOMNode()).offset();
-			var x = e.pageX - offset.left
-			var y = e.pageY - offset.top
-
-
-			if ($(e.target).parents(".symbol").length > 0)
-				return;
+		canvas_Click: function(x,y,button, target) {
 
 			var deselected = this.deselectSymbols();
 
@@ -430,18 +428,8 @@ define(function(require) {
 			}
 		},
 
-		canvas_onMouseDown: function(e) {
-
-			if (e.touches){
-				e.pageX = e.touches[0].pageX;
-				e.pageY = e.touches[0].pageY;
-			}
-
-			var offset = $(this.getDOMNode()).offset();
-			var x = e.pageX - offset.left;
-			var y = e.pageY - offset.top;
-
-			if(e.button === 0 || e.touches) {
+		canvas_Press: function(x,y, button, target) {
+			if(button === 0 || button == undefined) {
 				this.setState({
 					selectionBox: <SelectionBox originX={x} originY={y} onCommit={this.selection_commit} />
 				});
@@ -453,27 +441,52 @@ define(function(require) {
 			})
 		},
 
-		canvas_onMouseUp: function(e) {
-			if (e.changedTouches){
-				console.log(e);
-				e.pageX = e.changedTouches[0].pageX;
-				e.pageY = e.changedTouches[0].pageY;
+		canvas_Release: function(x,y, button, target) {
+			if(this.state.mouseDownX && Math.abs(this.state.mouseDownX - x) < 1 &&
+			   this.state.mouseDownY && Math.abs(this.state.mouseDownY - y) < 1) {
+
+				this.canvas_Click(x,y, button, target);
 			}
+		},
+
+		canvas_MouseDown: function(e) {
 
 			var offset = $(this.getDOMNode()).offset();
 			var x = e.pageX - offset.left;
 			var y = e.pageY - offset.top;
 
-			if(this.state.mouseDownX && Math.abs(this.state.mouseDownX - x) < 1 &&
-			   this.state.mouseDownY && Math.abs(this.state.mouseDownY - y) < 1) {
+			this.canvas_Press(x, y, e.button, e.target);
+		},
 
-				this.canvas_onClick(e);
+		canvas_MouseUp: function(e) {
+			console.log("CMU");
+			var offset = $(this.getDOMNode()).offset();
+			var x = e.pageX - offset.left;
+			var y = e.pageY - offset.top;
 
+			this.canvas_Release(x, y, e.button, e.target);
+		},
+
+		canvas_TouchStart: function(e) {
+			if (e.touches.length == 1) {
+
+				var offset = $(this.getDOMNode()).offset();
+				var x = e.touches[0].pageX - offset.left;
+				var y = e.touches[0].pageY - offset.top;
+
+				this.canvas_Press(x, y, 0, e.target);
 			}
 		},
 
-		canvas_onMouseMove: function(e) {
+		canvas_TouchEnd: function(e) {
 
+			if (e.changedTouches.length == 1) {
+				var offset = $(this.getDOMNode()).offset();
+				var x = e.changedTouches[0].pageX - offset.left;
+				var y = e.changedTouches[0].pageY - offset.top;
+
+				this.canvas_Release(x, y, 0, e.target);
+			}
 		},
 
 		deselectSymbols: function() {
@@ -503,33 +516,33 @@ define(function(require) {
 			return selected;
 		},
 
-		symbol_onClick: function(e,s) {
+		symbol_Click: function(x,y,s) {
 
 			this.deselectSymbols();
 			s.props.selected = true;
 
 			this.forceUpdate();
-
-			e.preventDefault();
-			return false;
 		},
 
-		symbol_onMouseDown: function(e,k) {
-			if (e.touches){
-				e.screenX = e.touches[0].screenX;
-				e.screenY = e.touches[0].screenY;
-			}
+		symbol_Grab: function(x, y, k) {
+
+			// If this symbol is not already selected, deselect all others.
 
 			if(!this.state.symbols[k].props.selected)
 				this.deselectSymbols();
 
+			// If we're currently displaying the input box, remove it.
 			if (this.state.inputBox)
 				this.state.inputBox.commit();
+
+			// If nothing is selected, select this symbol.
 
 			var selectedSymbols = this.getSelectedSymbols();
 
 			if (selectedSymbols.length == 0)
 				selectedSymbols = [this.state.symbols[k]]
+
+			// Record where these symbols were when we started dragging.
 
 			for (var j in selectedSymbols) {
 				var s = selectedSymbols[j];
@@ -538,26 +551,23 @@ define(function(require) {
 				s.props.dragStartY = s.props.y;
 			}
 
+			// Record that we are dragging, and where the mouse was when we started.
+
 			this.setState({
 				draggingSymbols: selectedSymbols,
-				dragStartMouseX: e.screenX,
-				dragStartMouseY: e.screenY,
-				mouseDownSymbol: this.state.symbols[k],
+				symbolGrabX: x,
+				symbolGrabY: y,
+				grabbedSymbol: this.state.symbols[k],
 			});
 
-			e.preventDefault();
+			// Do not bubble this event - we've dealt with it.
+
 			return false;
 		},
 
-		symbol_onMouseUp: function(e,k) {
-
-		},
-
-		symbol_onMouseMove: function(e,k) {
-
-		},
-
 		componentDidMount: function() {
+
+			// Disable text selection as much as we can, so that we can drag things around.
 			$(this.getDOMNode()).on("selectstart", function() { return false;})
 			$(this.getDOMNode()).parents().on("selectstart", function() { return false;})
 		},
@@ -571,10 +581,10 @@ define(function(require) {
 
 				console.log("Start drag:", nextState.draggingSymbols);
 
-				window.addEventListener("mousemove", this.dragMouseMove);
-				window.addEventListener("mouseup", this.dragMouseUp);
-				window.addEventListener("touchmove", this.dragMouseMove);
-				window.addEventListener("touchend", this.dragMouseUp);
+				window.addEventListener("mousemove", this.window_MouseMove);
+				window.addEventListener("mouseup", this.window_MouseUp);
+				window.addEventListener("touchmove", this.window_TouchMove);
+				window.addEventListener("touchend", this.window_TouchEnd);
 			}
 
 			// Deal with drag end
@@ -583,21 +593,14 @@ define(function(require) {
 
 				console.log("End drag:", this.state.draggingSymbols);
 
-				window.removeEventListener("mousemove", this.dragMouseMove);
-				window.removeEventListener("mouseup", this.dragMouseUp);
-				window.removeEventListener("touchmove", this.dragMouseMove);
-				window.removeEventListener("touchend", this.dragMouseUp);
+				window.removeEventListener("mousemove", this.window_MouseMove);
+				window.removeEventListener("mouseup", this.window_MouseUp);
+				window.removeEventListener("touchmove", this.window_TouchMove);
+				window.removeEventListener("touchend", this.window_TouchEnd);
 			}
 		},
 
-		dragMouseMove: function(e) {
-			if (e.touches){
-				e.screenX = e.touches[0].screenX;
-				e.screenY = e.touches[0].screenY;
-			}
-			var dx = e.screenX - this.state.dragStartMouseX;
-			var dy = e.screenY - this.state.dragStartMouseY;
-
+		window_DragMove: function(dx, dy) {
 			for(var i in this.state.draggingSymbols) {
 				var s = this.state.draggingSymbols[i];
 
@@ -605,18 +608,10 @@ define(function(require) {
 				s.props.y = s.props.dragStartY + dy;
 			}
 
-
 			this.forceUpdate();
-			return false;
 		},
 
-		dragMouseUp: function(e) {
-			if (e.changedTouches){
-				e.screenX = e.changedTouches[0].screenX;
-				e.screenY = e.changedTouches[0].screenY;
-			}
-			var dx = e.screenX - this.state.dragStartMouseX;
-			var dy = e.screenY - this.state.dragStartMouseY;
+		window_Drop: function(dx, dy) {
 
 			// Delete any symbols now outside the canvas. We have to do this every time, because we might not have dragged a newly created symbol from the menu.
 
@@ -629,29 +624,75 @@ define(function(require) {
 					delete this.state.symbols[sym.props.key];
 				}
 			}
+
 			this.forceUpdate();
 
-
 			if (Math.abs(dx) < 1 && Math.abs(dy) < 1) { // Change this to allow less precise clicks
-				this.symbol_onClick(e, this.state.mouseDownSymbol);
-			} 
+				this.symbol_Click(this.state.symbolGrabX, this.state.symbolGrabY, this.state.grabbedSymbol);
+			}
 
 			this.setState({
 				draggingSymbols: null,
-				mouseDownSymbol: null,
+				grabbedSymbol: null,
 			});
+
+
+		},
+
+		window_MouseMove: function(e) {
+			var symbol = $(this.state.grabbedSymbol.getDOMNode());
+			var canvas = $(this.getDOMNode());
+
+			var dx = e.pageX - (canvas.offset().left + this.state.grabbedSymbol.props.dragStartX - symbol.width() / 2 + this.state.symbolGrabX);
+			var dy = e.pageY - (canvas.offset().top + this.state.grabbedSymbol.props.dragStartY - symbol.height() / 2 + this.state.symbolGrabY);
+			
+			this.window_DragMove(dx, dy);
+		},
+
+		window_MouseUp: function(e) {
+			var symbol = $(this.state.grabbedSymbol.getDOMNode());
+			var canvas = $(this.getDOMNode());
+
+			var dx = e.pageX - (canvas.offset().left + this.state.grabbedSymbol.props.dragStartX - symbol.width() / 2 + this.state.symbolGrabX);
+			var dy = e.pageY - (canvas.offset().top + this.state.grabbedSymbol.props.dragStartY - symbol.height() / 2 + this.state.symbolGrabY);
+
+			this.window_Drop(dx, dy);
+		},
+
+		window_TouchMove: function(e) {
+			if (e.touches.length == 1) {
+				var symbol = $(this.state.grabbedSymbol.getDOMNode());
+				var canvas = $(this.getDOMNode());
+
+				var dx = e.changedTouches[0].pageX - (canvas.offset().left + this.state.grabbedSymbol.props.dragStartX - symbol.width() / 2 + this.state.symbolGrabX);
+				var dy = e.changedTouches[0].pageY - (canvas.offset().top + this.state.grabbedSymbol.props.dragStartY - symbol.height() / 2 + this.state.symbolGrabY);
+				this.window_DragMove(dx, dy);
+			}
+			e.preventDefault();
+			return false;
+		},
+
+		window_TouchEnd: function(e) {
+			if (e.changedTouches.length == 1) {
+
+				var symbol = $(this.state.grabbedSymbol.getDOMNode());
+				var canvas = $(this.getDOMNode());
+
+				var dx = e.changedTouches[0].pageX - (canvas.offset().left + this.state.grabbedSymbol.props.dragStartX - symbol.width() / 2 + this.state.symbolGrabX);
+				var dy = e.changedTouches[0].pageY - (canvas.offset().top + this.state.grabbedSymbol.props.dragStartY - symbol.height() / 2 + this.state.symbolGrabY);
+
+				this.window_Drop(dx, dy);
+
+			}
 		},
 
 		render: function() {
 			return (
 				<div className="equation-canvas" 
-					onClick={this.canvas_onClick}
-					onMouseDown={this.canvas_onMouseDown}
-					onMouseUp={this.canvas_onMouseUp}
-					onMouseMove={this.canvas_onMouseMove}
-					onTouchStart={this.canvas_onMouseDown}
-					onTouchMove={this.canvas_onMouseMove}
-					onTouchEnd={this.canvas_onMouseUp}>
+					onMouseDown={this.canvas_MouseDown}
+					onMouseUp={this.canvas_MouseUp}
+					onTouchStart={this.canvas_TouchStart}
+					onTouchEnd={this.canvas_TouchEnd}>
 					{this.state.symbols}
 					{this.state.inputBox}
 					{this.state.selectionBox}
@@ -670,13 +711,14 @@ define(function(require) {
 			};
 		},
 
-		spawnSymbol: function(e, i) {
+		spawnSymbol: function(grabX, grabY, i) {
+
 			var src = this.refs["symbol" + i];
 			var srcBtn = this.refs["button" + i];
 
 			var offset = $(srcBtn.getDOMNode()).offset();
 
-			this.props.onSpawnSymbol(offset.left + src.props.x, offset.top + src.props.y, src.props.fontSize, src.props.token, e);
+			this.props.onSpawnSymbol(offset.left + src.props.x, offset.top + src.props.y, src.props.fontSize, src.props.token, grabX, grabY);
 
 			$(src.getDOMNode()).hide().fadeIn(1000);
 		},
@@ -692,21 +734,29 @@ define(function(require) {
 				
 				(function(i) {
 
-					var spawn = function(e) {
+					var spawnMouse = function(e) {
+						var offset = $(this.refs["symbol" + i].getDOMNode()).offset();
+						this.spawnSymbol(e.pageX - offset.left, e.pageY - offset.top, i);
 
-						this.spawnSymbol(e,i);
+					}.bind(this);
+
+					var spawnTouch = function(e) {
+						if (e.touches.length == 1) {
+							var offset = $(this.refs["symbol" + i].getDOMNode()).offset();
+							this.spawnSymbol(e.touches[0].pageX - offset.left, e.touches[0].pageY - offset.top ,i);
+						}
 
 					}.bind(this);
 
 					var symbol = (
-						<li className="symbol-button" onMouseDown={spawn} onTouchStart={spawn} ref={"button" + i} key={i} style={{
+						<li className="symbol-button" onMouseDown={spawnMouse} onTouchStart={spawnTouch} ref={"button" + i} key={i} style={{
 							left: this.props.orientation == "vertical" ? 0 : this.props.btnSize * i,
 							top: this.props.orientation == "vertical" ? this.props.btnSize * i : 0,
 							width: btnWidth,
 							height: btnHeight,
 
 						}}>
-							<Symbol x={btnWidth/2} y={btnHeight/2} fontSize={this.props.btnSize*0.7} token={this.props.tokens[i]} onMouseMove={nop} onMouseDown={nop} onMouseUp={nop} key={i} ref={"symbol" + i }/>
+							<Symbol x={btnWidth/2} y={btnHeight/2} fontSize={this.props.btnSize*0.7} token={this.props.tokens[i]} onGrab={nop} key={i} ref={"symbol" + i }/>
 						</li>
 					);
 
@@ -733,11 +783,11 @@ define(function(require) {
 
 	var Editor = React.createClass({
 
-		handleSpawnSymbol: function(pageX, pageY, fontSize, token, mouseDownEvent) {
+		menu_SpawnSymbol: function(pageX, pageY, fontSize, token, grabX, grabY) {
 
 			var canvasOffset = $(this.refs.canvas.getDOMNode()).offset();
-			var newSymbolIndex = this.refs.canvas.injectSymbol(pageX - canvasOffset.left, pageY - canvasOffset.top, fontSize, token);
-			this.refs.canvas.symbol_onMouseDown(mouseDownEvent, newSymbolIndex);
+			var newSymbolKey = this.refs.canvas.injectSymbol(pageX - canvasOffset.left, pageY - canvasOffset.top, fontSize, token);
+			this.refs.canvas.symbol_Grab(grabX, grabY, newSymbolKey);
 		},
 
 		render: function() {
@@ -746,8 +796,8 @@ define(function(require) {
 			return (
 				<div className="equation-editor">
 					<CanvasComponent ref="canvas"/>
-					<SymbolMenu left={0} top={80} width={80} btnSize={80} tokens={["+", "–", "="]} className="thing" onSpawnSymbol={this.handleSpawnSymbol} />
-					<SymbolMenu right={0} top={80} width={80} btnSize={80} tokens={["x", "y", "z"]} className="thing" onSpawnSymbol={this.handleSpawnSymbol} />
+					<SymbolMenu left={0} top={80} width={80} btnSize={80} tokens={["+", "–", "="]} className="thing" onSpawnSymbol={this.menu_SpawnSymbol} />
+					<SymbolMenu right={0} top={80} width={80} btnSize={80} tokens={["x", "y", "z"]} className="thing" onSpawnSymbol={this.menu_SpawnSymbol} />
 				</div>
 			);
 		}
