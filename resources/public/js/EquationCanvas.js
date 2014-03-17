@@ -232,6 +232,7 @@ define(function(require) {
 		},
 
 		commit: function() {
+			console.log("COMMIT", this);
 			this.props.onCommit(this.props.x - this.props.fontSize / 2 + this.state.width / 2, this.props.y, this.props.fontSize, this.state.value);			
 		},
 
@@ -459,7 +460,7 @@ define(function(require) {
 		},
 
 		canvas_MouseUp: function(e) {
-			console.log("CMU");
+
 			var offset = $(this.getDOMNode()).offset();
 			var x = e.pageX - offset.left;
 			var y = e.pageY - offset.top;
@@ -473,6 +474,10 @@ define(function(require) {
 				var offset = $(this.getDOMNode()).offset();
 				var x = e.touches[0].pageX - offset.left;
 				var y = e.touches[0].pageY - offset.top;
+
+				// Need this because touch events don't always cause inputbox to blur.
+				if(this.state.inputBox)
+					this.state.inputBox.commit();
 
 				this.canvas_Press(x, y, 0, e.target);
 			}
