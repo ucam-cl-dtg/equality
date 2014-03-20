@@ -16,6 +16,8 @@
 	bottom: 0px;
     background: #eef8ff;
     font-size: 48px;
+    z-index: 0;
+    overflow: hidden;
 }
 
 .equation-canvas .token-input {
