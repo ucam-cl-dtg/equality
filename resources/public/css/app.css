@@ -25,20 +25,75 @@
 
 .symbol {
 	position: absolute;
-/*    background: #fdd;*/
+	z-index: 10;
+}
+
+.symbol.container {
+	z-index: 5;
 }
 
 .symbol-content {
 	position: absolute;
 }
 
-.symbol-hit-region {
+.symbol-content.sqrt {
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+}
+
+.symbol-grab-region {
 	position: absolute;
 	left: 0;
 	top: 0;
 	width: 100%;
 	height: 100%;
 	cursor: pointer;
+}
+
+.handle {
+	position: absolute;
+	cursor: pointer;
+	opacity: 0.5;
+	display:none;
+	width: 50px;
+	height: 50px;
+	background-size: 50px 50px;
+}
+
+.symbol .symbol-resize.handle {
+	right: -50px;
+	bottom: -50px;
+
+	background-image: url(../images/resize_spherical.png);
+}
+
+.symbol .symbol-move.handle {
+	left: 50%;
+	margin-left: -25px;
+	bottom: -50px;
+
+	background-image: url(../images/move_spherical.png);
+}
+
+.symbol .symbol-delete.handle {
+	left: 100%;
+	bottom: 100%;
+
+	background-image: url(../images/close_spherical.png);
+}
+
+.symbol.selected.allowMoveHandle .symbol-move.handle {
+	display: block;
+}
+
+.symbol.selected.allowResizeHandle .symbol-resize.handle {
+	display: block;
+}
+
+.symbol.selected.allowDeleteHandle .symbol-delete.handle {
+	display: block;
 }
 
 .symbol .selection-outline {
