@@ -10,9 +10,9 @@
 
 .equation-canvas {
 	position: absolute;
-	left: 80px;
-	right: 80px;
-	top: 80px;
+	left: 120px;
+	right: 120px;
+	top: 120px;
 	bottom: 0px;
     background: #eef8ff;
     font-size: 48px;
@@ -27,6 +27,7 @@
 
 .symbol {
 	position: absolute;
+	cursor: pointer;
 	z-index: 10;
 }
 
@@ -45,33 +46,24 @@
 	height: 100%;
 }
 
-.symbol-grab-region {
-	position: absolute;
-	left: 0;
-	top: 0;
-	width: 100%;
-	height: 100%;
-	cursor: pointer;
-}
-
 .handle {
 	position: absolute;
 	cursor: pointer;
 	opacity: 0.5;
-	display:none;
 	width: 50px;
 	height: 50px;
 	background-size: 50px 50px;
+	z-index: 20;
 }
 
-.symbol .symbol-resize.handle {
+.resize.handle {
 	right: -50px;
 	bottom: -50px;
 
 	background-image: url(../images/resize_spherical.png);
 }
 
-.symbol .symbol-move.handle {
+.move.handle {
 	left: 50%;
 	margin-left: -25px;
 	bottom: -50px;
@@ -79,58 +71,111 @@
 	background-image: url(../images/move_spherical.png);
 }
 
-.symbol .symbol-delete.handle {
+.delete.handle {
 	left: 100%;
 	bottom: 100%;
 
 	background-image: url(../images/close_spherical.png);
 }
 
-.symbol.selected.allowMoveHandle .symbol-move.handle {
-	display: block;
-}
-
-.symbol.selected.allowResizeHandle .symbol-resize.handle {
-	display: block;
-}
-
-.symbol.selected.allowDeleteHandle .symbol-delete.handle {
-	display: block;
-}
-
 .symbol .selection-outline {
+	display: none;
 	position: absolute;
 	left: -5px;
 	top: -5px;
 	right: -5px;
 	bottom: -5px;
-	border: 1px dashed #800;
+	border: 1px dashed rgba(128,0,0,0.2);
+}
+
+.symbol.selected {
+	color: #00d;
+}
+
+.symbol.selected .selection-outline {
+	display: block;
+}
+
+.lasso
+{
+	position:absolute;
+	border: 1px solid #00c;
+	background: rgba(200,200,255,0.1);
 }
 
 .selection-box
 {
-	position:absolute;
-	border: 1px solid #00c;
-	background: rgba(0,0,255,0.1);
+	position: absolute;
+	border: 1px dashed #800;
 }
 
-ul.symbol-menu {
+.symbol-menu {
+	position: absolute;
+	background: #ced8df;
+	border: 1px solid #bec8cf;
+}
+
+.symbol-menu .list-container {
+	overflow: hidden;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+}
+
+
+.symbol-menu ul {
 	position: absolute;
 	list-style-type: none;
 	padding: 0;
 	margin: 0;
+	line-height:0;
+	font-size:0;
 }
 
-ul.symbol-menu li {
-	display: block;
+.symbol-menu ul:not(.scrolling) {
+	-webkit-transition: top 0.2s ease-out, left 0.2s ease-out;
+	transition: top 0.2s ease-out, left 0.2s ease-out;
 }
-.symbol-button {
-	position: absolute;
+
+.symbol-menu.vertical ul {
+	width: 100%;
+}
+
+.symbol-menu.horizontal ul {
+	height: 100%;
+}
+
+.symbol-menu li {
+	display:inline-block;
+	position: relative;
 	cursor: pointer;
-/*	border: 1px solid #850;
-	border-bottom: none;*/
+	margin: -0.5px;
+	padding: 0;
 }
 
-.symbol-button:last-child {
-/*	border-bottom: 1px solid #850;*/
+
+.symbol-menu.vertical li {
+	width: 100%;
+}
+
+.symbol-menu.horizontal li {
+	height: 100%;
+}
+
+.submenu {
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	background: rgba(0,0,0,0.1);
+}
+
+.submenu-background {
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 10000px;
+	height: 10000px;
+	opacity: 0;
 }

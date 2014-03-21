@@ -2,7 +2,7 @@ require.config({
 
     baseUrl: 'js',
 
-    urlArgs: "bust=" + (new Date()).getTime(),
+    //urlArgs: "bust=" + (new Date()).getTime(),
 
     paths: {
         react: 'react/react-with-addons',
