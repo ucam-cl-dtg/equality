@@ -545,7 +545,7 @@ RSVP.on('error', function(reason) {
 
 		render: function() {
 			return (
-				<div className="lasso"
+				<div className="lasso-box"
 					style={this.getBounds()} />
 			);
 		}
@@ -592,7 +592,7 @@ RSVP.on('error', function(reason) {
 				inputBox: null,
 				draggingSymbols: null,
 				selectionBox: null,
-				touchMode: "pan",
+				touchMode: "lasso",
 			};
 		},
 
@@ -833,15 +833,29 @@ RSVP.on('error', function(reason) {
 			window.addEventListener("keydown", this.window_KeyDown);
 
 			this.canvasHandler = new InteractionHandler(this.getDOMNode(), this.canvas_Grab, this.canvas_Drag, this.canvas_Drop, this.canvas_Click);
+			this.panHandler = new InteractionHandler(this.refs.panMode.getDOMNode(), null, null, null, this.mode_Change.bind(this, "pan"));
+			this.lassoHandler = new InteractionHandler(this.refs.lassoMode.getDOMNode(), null, null, null, this.mode_Change.bind(this, "lasso"));
+		},
+
+		componentWillUnmount: function() {
+			this.canvasHandler.removeHandlers();
+			this.panHandler.removeHandlers();
+			this.lassoHandler.removeHandlers();
+		},
+
+		mode_Change: function(newMode) {
+			this.setState({
+				touchMode: newMode,
+			})
 		},
 
 		canvas_Grab: function(pageX, pageY, localX, localY, e) {
 
-			if (e.button == 2 || (e.touches && this.state.touchMode == "pan")) {
+			if (this.state.touchMode == "pan") {
 				this.setState({
 					dragMode: "pan",
 				})
-			} else if (e.button == 0 || (e.touches && this.state.touchMode == "lasso")) {
+			} else if (this.state.touchMode == "lasso") {
 				this.setState({
 					dragMode: "lasso",
 					lassoOriginX: localX,
@@ -1006,6 +1020,8 @@ RSVP.on('error', function(reason) {
 					{inputBox}
 					{lasso}
 					{selectionBox}
+					<div className={"mode pan" + (this.state.touchMode == "pan" ? " selected" : "")} ref="panMode" />
+					<div className={"mode lasso" + (this.state.touchMode == "lasso" ? " selected" : "")} ref="lassoMode" />
 				</div>
 			);
 		}

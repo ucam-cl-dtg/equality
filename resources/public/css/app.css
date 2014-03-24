@@ -96,7 +96,7 @@
 	display: block;
 }
 
-.lasso
+.lasso-box
 {
 	position:absolute;
 	border: 1px solid #00c;
@@ -178,4 +178,31 @@
 	width: 10000px;
 	height: 10000px;
 	opacity: 0;
+}
+
+.mode {
+	position: absolute;
+	top: 0px;
+	width: 80px;
+	height: 80px;
+	background-size: 50px 50px;
+	background-position: center;
+	background-repeat: no-repeat;
+	border: 1px solid #bec8cf;
+	cursor: pointer;
+	opacity: 0.2;
+}
+
+.mode.pan {
+	right: 0px;
+	background-image: url(../images/move_black.png);
+}
+
+.mode.lasso {
+	left: 0px;
+	background-image: url(../images/select.png);
+}
+
+.mode.selected {
+	opacity: 1;
 }
