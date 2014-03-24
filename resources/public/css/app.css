@@ -191,6 +191,7 @@
 	border: 1px solid #bec8cf;
 	cursor: pointer;
 	opacity: 0.2;
+	z-index: 25;
 }
 
 .mode.pan {
