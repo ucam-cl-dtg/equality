@@ -378,4 +378,4 @@
 
 (set! (.-onmessage js/self) (fn [e]
                               (let [symbols (.-data.symbols e)]
-                                (.postmessage js/self (get-best-results symbols)))))
+                                (.postMessage js/self (get-best-results symbols)))))
