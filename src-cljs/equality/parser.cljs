@@ -9,6 +9,7 @@
       (fn [& args]
         (.apply js/console.log js/console (into-array args))))
 
+
 (derive :type/num :type/expr)
 (derive :type/var :type/expr)
 (derive :type/add :type/expr)
@@ -165,7 +166,7 @@
                                 (for [e potential-exponents
                                       :let [remaining-input (disj remaining-input e)]]
 
-                                  ;; Now we have found b^e and removed b and e from our input. 
+                                  ;; Now we have found b^e and removed b and e from our input.
                                   ;; Create a new :type/pow which refers to them, and add it to the set of results
 
                                   (conj remaining-input (merge {:type :type/pow
@@ -199,7 +200,7 @@
                                                                                     (if (= (:type %) :type/mult)
                                                                                       (not= (:type (:left-op %)) :type/num)
                                                                                       true)
-                                                                                    (isa? (:type %) :type/expr)) remaining-input)]                                            
+                                                                                    (isa? (:type %) :type/expr)) remaining-input)]
                                             :when (not-empty potential-right-ops)]
                                         (for [right potential-right-ops
                                               :let [remaining-input (disj remaining-input right)]]
@@ -262,7 +263,7 @@
                           (apply concat result-sets-list)))}})
 
 
-;; The parse function takes an input set of items, each of which might be a symbol, 
+;; The parse function takes an input set of items, each of which might be a symbol,
 ;; expression or equation etc., and attempts to combine them using the rules defined above.
 ;; This process will produce many possible output sets of items, with rules applied (or not) in various orders.
 ;; Returns a list of output sets of items.
@@ -272,14 +273,14 @@
   (memoize
    (fn [input]
 
-     ;; For every rule, apply it to the input list 
+     ;; For every rule, apply it to the input list
 
      (let [rule-outputs (for [[k r] rules
                           :let [new-inputs ((:apply r) input)]
                           :when (not-empty new-inputs)]
 
-                          ;; new-inputs is now a list of result-sets. Each result set is a 
-                          ;; transformation of the original input, hopefully with some 
+                          ;; new-inputs is now a list of result-sets. Each result set is a
+                          ;; transformation of the original input, hopefully with some
                           ;; items combined by this rule.
 
                           ;; Parse each of these new result sets, in the hope of
@@ -321,7 +322,7 @@
 
         result       (parse input)
 
-        ;; result is now a list. Every set contains all the input items, combined by the rules in various ways. 
+        ;; result is now a list. Every set contains all the input items, combined by the rules in various ways.
         ;; Some will obviously be "better" than others, what follows is to choose these "good" parses.
 
         ;; Store the number of items and number of symbols in the metadata of each set.
@@ -336,11 +337,11 @@
 
         ;; Add the removed sets back in to the results, but with a flag mentioning that they overlap.
 
-        result       (map #(clojure.set/union % (set (map (fn [m] (assoc m :overlap true)) 
-                                                          (:removed (meta %))))) 
+        result       (map #(clojure.set/union % (set (map (fn [m] (assoc m :overlap true))
+                                                          (:removed (meta %)))))
                           result)
 
-        ;; Sort results by number of non-overlapping items, then 
+        ;; Sort results by number of non-overlapping items, then
         ;; by the number of symbols in non-overlapping items.
 
         result       (sort (fn [a b] (let [ca (count (without-overlap a))
@@ -373,3 +374,8 @@
     (apply str (map print-expr (:parsed-math best-results)))
     (clj->js {:mathml (apply str (map mathml best-results))
               :unusedSymbols unused-symbols})))
+
+
+(set! (.-onmessage js/self) (fn [e]
+                              (let [symbols (.-data.symbols e)]
+                                (.postmessage js/self (get-best-results symbols)))))
