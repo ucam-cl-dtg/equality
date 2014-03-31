@@ -1,3 +1,10 @@
+
+@import "settings";
+@import "../normalize";
+@import "../foundation";
+
+@import "../foundicons/general_foundicons/general_foundicons";
+
 #mathjax-dummy {
 	 display: none;
 }
@@ -6,6 +13,7 @@
 	width: 100%;
 	height: 100%;
 	background: #f8ffee;
+	
 }
 
 .equation-canvas {
@@ -13,8 +21,8 @@
 	left: 120px;
 	right: 120px;
 	top: 120px;
-	bottom: 0px;
-    background: #eef8ff;
+	bottom: 150px;
+    background: white;
     font-size: 48px;
     z-index: 0;
     overflow: hidden;
@@ -23,6 +31,7 @@
 .equation-canvas .token-input {
 	position: absolute;
 	background: rgba(255,255,255,0.6);
+	height: initial;
 }
 
 .symbol {
@@ -94,6 +103,37 @@
 
 .symbol.selected .selection-outline {
 	display: block;
+}
+
+.symbol.unused {
+	color: #c00;
+}
+
+.symbol .locator {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	background-color: black;
+	opacity: 0.3;
+}
+
+.symbol .locator .horizontal {
+	position: absolute;
+	left: 0;
+	top: 0;
+	height: 1px;
+	width: 500px;
+	margin-left: -250px;
+	background-color: black;
+}
+.symbol .locator .vertical {
+	position: absolute;
+	left: 0;
+	top: 0;
+	width: 1px;
+	height: 500px;
+	margin-top: -250px;
+	background-color: black;
 }
 
 .lasso-box
@@ -206,4 +246,15 @@
 
 .mode.selected {
 	opacity: 1;
+}
+
+.parsed-equation {
+	position: absolute;
+	width: 100%;
+	height: 150px;
+	bottom: 0;
+	text-align: center;
+	font-size: 48px;
+	border-top: 1px solid #bec8cf;
+	background-color: #eef8ff;
 }

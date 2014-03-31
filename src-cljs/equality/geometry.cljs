@@ -84,6 +84,12 @@
 
       (some #(line-intersects-box? % box2) (box-lines box1))))
 
+(defn box-contains-box [container contained]
+  (and (> (:left contained) (:left container))
+       (> (:top contained) (:top container))
+       (< (bbox-right contained) (bbox-right container))
+       (< (bbox-bottom contained) (bbox-bottom container))))
+
 (defn all-pairs [coll]
   (distinct (for [a coll
                   b coll

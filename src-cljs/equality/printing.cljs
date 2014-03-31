@@ -28,6 +28,9 @@
 
 (defmulti mathml-inner :type)
 
+(defmethod mathml-inner nil [expr]
+  "")
+
 (defmethod mathml-inner :type/var [expr]
   (str "<mi id=\"" (:id expr) "\">" (:token expr) "</mi>"))
 
@@ -51,6 +54,9 @@
 
 (defmethod mathml-inner :type/frac [expr]
   (str "<mfrac id=\"" (:id expr) "\"><mrow>" (mathml-inner (:numerator expr)) "</mrow><mrow>" (mathml-inner (:denominator expr)) "</mrow></mfrac>"))
+
+(defmethod mathml-inner :type/sqrt [expr]
+  (str "<msqrt id=\"" (:id expr) "\">" (mathml-inner (:radicand expr)) "</msqrt>"))
 
 (defn mathml [expr]
   (str "<math display=\"block\"><mrow>" (mathml-inner expr) "</mrow></math>"))

@@ -9,7 +9,6 @@
       (fn [& args]
         (.apply js/console.log js/console (into-array args))))
 
-
 (derive :type/num :type/expr)
 (derive :type/var :type/expr)
 (derive :type/add :type/expr)
@@ -17,6 +16,7 @@
 (derive :type/mult :type/expr)
 (derive :type/frac :type/expr)
 (derive :type/pow :type/expr)
+(derive :type/sqrt :type/expr)
 ;; NOTE: :type/eq is not an expr!
 
 (defn precedence [type]
@@ -29,9 +29,13 @@
     :type/mult 10
     :type/eq 1
     :type/frac 15
-    :type/pow 20))
+    :type/pow 20
+    :type/sqrt 999))
 
 (defmulti symbols :type)
+
+(defmethod symbols nil [expr]
+  [])
 
 (defmethod symbols :type/symbol [expr]
   [expr])
@@ -59,6 +63,9 @@
 
 (defmethod symbols :type/pow [expr]
   (concat (symbols (:base expr)) (symbols (:exponent expr))))
+
+(defmethod symbols :type/sqrt [expr]
+  (concat [expr] (symbols (:radicand expr))))
 
 (defn numeric? [str]
   (not (js/isNaN (js/parseFloat str))))
@@ -109,7 +116,7 @@
           ;; Concatenate all the result sets into a final list.
           (apply concat result-sets-list))))
 
-(def non-var-symbols #{"+" "-" "="})
+(def non-var-symbols #{"+" "-" "–" "="})
 
 ;; Each rule has an :apply function, which takes a set of entities and returns a list of sets of entities, where
 ;; each element of the list is a transformation of the input set, hopefully with some entities combined into bigger ones.
@@ -222,7 +229,7 @@
                                 (apply concat result-sets-list)))}
 
    "addition" {:apply (binary-op-rule "+" :type/add)}
-   "subtraction" {:apply (binary-op-rule "-" :type/sub)}
+   "subtraction" {:apply (binary-op-rule "–" :type/sub)}
    "equals" {:apply (binary-op-rule "=" :type/eq)}
    "fraction" {:apply (fn [input]
                         (let [frac-lines (filter #(and (isa? (:type %) :type/symbol)
@@ -260,7 +267,24 @@
                                                                                     (:symbol-count numerator)
                                                                                     (:symbol-count denominator))}
                                                                   (geom/bbox-combine t numerator denominator)))))]
-                          (apply concat result-sets-list)))}})
+                          (apply concat result-sets-list)))}
+   "sqrt" {:apply (fn [input]
+                    (let [radicals (filter #(and (isa? (:type %) :type/symbol)
+                                                 (= (:token %) :sqrt)) input)
+                          result-sets-list (for [r radicals
+                              :let [remaining-input (disj input r)
+                                    potential-radicands (filter #(and (isa? (:type %) :type/expr)
+                                                                      (geom/box-contains-box r %)) remaining-input)]
+                              :when (not-empty potential-radicands)]
+                            (for [radicand potential-radicands
+                                  :let [remaining-input (disj remaining-input radicand)]]
+                              (conj remaining-input (merge {:id (:id r)
+                                                            :type :type/sqrt
+                                                            :radicand radicand
+                                                            :symbol-count (+ 1 (:symbol-count radicand))}
+                                                            (geom/bbox-combine r radicand)))))]
+                          (apply concat result-sets-list)))}
+})
 
 
 ;; The parse function takes an input set of items, each of which might be a symbol,
@@ -317,62 +341,38 @@
   (with-meta (map f m) (meta m)))
 
 (defn get-best-results [input]
-  (let [input         (to-clj-input input)
-        all-symbols  (set (map :id (flatten (map symbols input))))
+  (let [input       (to-clj-input input)
+        all-symbols (set (map :id (flatten (map symbols input))))
 
-        result       (parse input)
+        result      (parse input)
 
-        ;; result is now a list. Every set contains all the input items, combined by the rules in various ways.
-        ;; Some will obviously be "better" than others, what follows is to choose these "good" parses.
 
-        ;; Store the number of items and number of symbols in the metadata of each set.
+        ;; Sort the results by the number of items left. Smaller is better (more combined)
 
-        result       (map #(with-meta % {:orig-count (count %)
-                                         :orig-symbol-count (apply + (map :symbol-count %))}) result)
+        best-parses (sort-by count result)
 
-        ;; For all those parse-sets that contain more than one final item,
-        ;; find items that physically overlap and keep only the ones with the most symbols.
+        best-result (first best-parses)
 
-        result       (filter not-empty (map-with-meta geom/remove-overlapping result))
+        ;; Within the best result, sort by number of symbols in combined items (more is better)
 
-        ;; Add the removed sets back in to the results, but with a flag mentioning that they overlap.
+        formulae    (reverse (sort-by :symbol-count best-result))
 
-        result       (map #(clojure.set/union % (set (map (fn [m] (assoc m :overlap true))
-                                                          (:removed (meta %)))))
-                          result)
+        _           (println "RESULT:" result)
 
-        ;; Sort results by number of non-overlapping items, then
-        ;; by the number of symbols in non-overlapping items.
+        ;; Remove all formulae that still have symbols in them.
 
-        result       (sort (fn [a b] (let [ca (count (without-overlap a))
-                                          cb (count (without-overlap b))]
-                                      (if (= ca cb)
-                                        (let [sa (apply + (map :symbol-count (without-overlap a)))
-                                              sb (apply + (map :symbol-count (without-overlap b)))]
-                                          (compare sb sa))
-                                        (compare ca cb)))) result)
+        formulae      (filter #(empty? (filter (fn [s] (= :type/symbol s)) %)) formulae)
 
-        least-things (count (without-overlap (first result)))
-        most-symbols (apply + (map :symbol-count (without-overlap (first result))))
+        ;; The the formula with most symbols
 
-        best-results (distinct (apply concat (filter #(and (= least-things (count (without-overlap %)))
-                                                           (= most-symbols (apply + (map :symbol-count (without-overlap %))))) result)))
-        used-symbols (set (map :id (flatten (map symbols (filter #(not= (:type %) :type/symbol) (filter #(not (:overlap %)) best-results))))))
+        formula     (first formulae)
 
-        unused-symbols (clojure.set/difference all-symbols used-symbols)
 
-        best-results (filter #(and (not= (:type %) :type/symbol)
-                                   (not (:overlap %))) best-results)]
+        unused-symbols (clojure.set/difference all-symbols (map :id (symbols formula)))
 
-    (println "***** Parse Results (Least things: " least-things ")*****")
+        ]
 
-    #_(pprint (map (fn [i] (cons (str "Orig count: " (:orig-count (meta i)))
-                                (cons (str "New count: " (count i))
-                                      (cons (str "Orig symbols: " (:orig-symbol-count (meta i)))
-                                            (cons (str "New symbols: " (apply + (map :symbol-count i)))
-                                                  (map simplify-map i)))))) (map without-overlap result)))
-    (apply str (map print-expr (:parsed-math best-results)))
-    (clj->js {:mathml (apply str (map mathml best-results))
+    (clj->js {:mathml  (mathml formula)
               :unusedSymbols unused-symbols})))
 
 

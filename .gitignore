@@ -10,3 +10,6 @@ pom.xml
 .lein-plugins
 .lein-env
 resources/public/js/parser.js
+.sass-cache/
+Thumbs.db
+resources/public/css/

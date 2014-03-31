@@ -50,6 +50,15 @@ RSVP.on('error', function(reason) {
 /////////////////////////////////
 
 	function clone(obj) { return JSON.parse(JSON.stringify(obj)); }
+
+	function memoize(fn) {
+		var cache = {};
+		return function() {
+			var hash = JSON.stringify(arguments);
+			return (hash in cache) ? cache[hash] : cache[hash] = fn.apply(this, arguments);
+		}
+	}
+
 	function absorbEvent(e) {
 		e.preventDefault();
 		return false;
@@ -72,16 +81,16 @@ RSVP.on('error', function(reason) {
 		return specs;
 	}
 
-	function getFontForToken(token, size) {
+	var getFontForToken = memoize(function(token, size) {
     	var code = token.charCodeAt(0);
 
 	    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122))
 	        return $("#mathjax-dummy .mi").css("font-size", size).css("font");
 	    else
 	        return $("#mathjax-dummy .mn").css("font-size", size).css("font");
-	}
+	});
 
-	function measureText(text, font, maxCharWidth, maxCharHeight) {
+	var measureText = memoize(function(text, font, maxCharWidth, maxCharHeight) {
 
 	    var c = $("<canvas/>");
 	    
@@ -125,7 +134,7 @@ RSVP.on('error', function(reason) {
 	            left: minX - 1,
 	            width: maxX - minX + 3,
 	            height: maxY - minY + 3};
-	}
+	});
 
 	function resizeSymbol(s, startSnapshot, totalDx, totalDy) {
 		switch(s.spec.type) {
@@ -149,6 +158,41 @@ RSVP.on('error', function(reason) {
 		}
 	}
 
+	function toParserSymbol(k, s) {
+
+		var r = {id: k, type: "type/symbol"};
+
+		switch(s.spec.type) {
+			case "string":
+
+		    	var font = getFontForToken(s.spec.token, s.spec.fontSize);
+	    		var bounds = measureText(s.spec.token, font, s.spec.fontSize, s.spec.fontSize * 2);
+
+	    		r.top = s.y - bounds.height / 2;
+	    		r.left = s.x - bounds.width / 2;
+	    		r.width = bounds.width;
+	    		r.height = bounds.height;
+	    		r.token = s.spec.token;
+
+				break;
+			case "container":
+
+				r.top = s.y - s.spec.height / 2;
+				r.left = s.x - s.spec.width / 2;
+				r.width = s.spec.width;
+				r.height = s.spec.height;
+
+				switch(s.spec.subType) {
+					case "sqrt":
+						r.token = ":sqrt";
+						break;
+				}
+
+				break;
+		}
+
+		return r;
+	}
 
 	var nextSymbolKey = 0;
 
@@ -310,6 +354,7 @@ RSVP.on('error', function(reason) {
     		var classes = React.addons.classSet({
     			symbol: true,
     			selected: this.props.selected,
+    			unused: this.props.unused,
     		});
 
 			return (
@@ -323,6 +368,13 @@ RSVP.on('error', function(reason) {
 						fontSize: this.props.spec.fontSize,
 					}}>
 
+					{this.props.displayLocator ?
+						<div className="locator">
+							<div className="vertical" />
+							<div className="horizontal" />
+						</div>
+						: null }
+
 					<div className="symbol-content" 
 						style={{
 							left: -bounds.left, // N.B. This clips the whitespace from the top and left of the character!
@@ -332,6 +384,7 @@ RSVP.on('error', function(reason) {
 						{this.props.spec.token}
 
 					</div>
+
 				</div>
 			);
 		}
@@ -385,6 +438,7 @@ RSVP.on('error', function(reason) {
     			symbol: true,
     			container: true,
     			selected: this.props.selected,
+    			unused: this.props.unused,
     		});
 
     		var grabRegionWidth = this.props.spec.height * 0.25;
@@ -596,11 +650,17 @@ RSVP.on('error', function(reason) {
 			};
 		},
 
+		symbols_Change: function() {
+			if(this.props.onChange)
+				this.props.onChange(this.state.symbols);
+		},
+
 		addSymbol: function(x,y,spec) {
 			var newKey = getNextSymbolKey();
 
 			this.state.symbols[newKey] = {x:x, y:y, spec:spec};
 			this.forceUpdate();
+			this.symbols_Change();
 		},
 
 		input_cancel: function() {
@@ -685,6 +745,10 @@ RSVP.on('error', function(reason) {
 			// If we're currently displaying the input box, remove it.
 			if (this.state.inputBox)
 				this.refs.inputBox.commit();
+
+			this.setState({
+				touchDragKey: e.touches ? key : null,
+			});
 		},
 
 		symbol_Drag: function(key, totalDx, totalDy, dx, dy, e) {
@@ -712,12 +776,16 @@ RSVP.on('error', function(reason) {
 			}
 
 			this.forceUpdate();
+			this.symbols_Change();
 		},
 
 		symbol_Drop: function(key, pageX, pageY, totalDx, totalDy, localX, localY, e) {
 			var n = $(this.getDOMNode())
 			var width = n.width();
 			var height = n.height();
+
+			var deleted = false;
+			// Delete dropped symbols that now fall outside the canvas.
 
 			var ss = this.getSelectedSymbolKeys();
 
@@ -732,10 +800,16 @@ RSVP.on('error', function(reason) {
 
 				if (x > width || x < 0 || y < 0 || y > height) {
 					delete this.state.symbols[k];
+					deleted = true;
 				}
 			}
 
+			this.setState({
+				touchDragKey: null,
+			})
 			this.forceUpdate();
+			if (deleted)
+				this.symbols_Change();
 		},
 
 		symbol_Click: function(key, pageX, pageY, localX, localY, e) {
@@ -761,12 +835,15 @@ RSVP.on('error', function(reason) {
 			}
 
 			this.forceUpdate();
+			this.symbols_Change();
 		},
 
 		selection_MoveEnd: function() {
 			var n = $(this.getDOMNode())
 			var width = n.width();
 			var height = n.height();
+
+			// Delete selected symbols that now fall outside the canvas.
 
 			var ss = this.getSelectedSymbolKeys();
 
@@ -782,6 +859,7 @@ RSVP.on('error', function(reason) {
 			}
 
 			this.forceUpdate();
+			this.symbols_Change();
 		},
 
 		selection_Delete: function() {
@@ -791,6 +869,7 @@ RSVP.on('error', function(reason) {
 			}
 
 			this.forceUpdate();
+			this.symbols_Change();
 		},
 
 		selection_StartResize: function() {
@@ -817,15 +896,15 @@ RSVP.on('error', function(reason) {
 			}	
 
 			this.forceUpdate();
+			this.symbols_Change();
 		},
 
 		componentDidMount: function() {
 
 			// Disable text selection as much as we can, so that we can drag things around.
+			$(this.getDOMNode()).on("contextmenu", function() { return false;})
 			$(this.getDOMNode()).on("selectstart", function() { return false;})
 			$(this.getDOMNode()).parents().on("selectstart", function() { return false;})
-			$(this.getDOMNode()).on("contextmenu", function() { return false;})
-			//$(this.getDOMNode()).parents().on("contextmenu", function() { return false;})
 
 			$("*").on("touchmove", function(e) {e.preventDefault();});
 
@@ -851,6 +930,10 @@ RSVP.on('error', function(reason) {
 
 		canvas_Grab: function(pageX, pageY, localX, localY, e) {
 
+			// If we're currently displaying the input box, remove it.
+			if (this.state.inputBox)
+				this.refs.inputBox.commit();
+
 			if (this.state.touchMode == "pan") {
 				this.setState({
 					dragMode: "pan",
@@ -866,9 +949,6 @@ RSVP.on('error', function(reason) {
 
 		canvas_Drag: function(totalDx, totalDy, dx, dy, e) {
 			
-			// If we're currently displaying the input box, remove it.
-			if (this.state.inputBox)
-				this.refs.inputBox.commit();
 
 			switch(this.state.dragMode) {
 				case "pan":
@@ -880,6 +960,7 @@ RSVP.on('error', function(reason) {
 					}
 
 					this.forceUpdate();
+					// No need to raise onChange here, even though symbol x and ys have changed. Result of parse will not have changed.
 					break;
 				case "lasso":
 					var newOpX = this.state.lassoOriginX + totalDx;
@@ -972,7 +1053,9 @@ RSVP.on('error', function(reason) {
 							spec={s.spec}
 							selected={s.selected} 
 							key={k}
-							ref={"symbol" + k}/>;
+							ref={"symbol" + k}
+							unused={this.props.unusedSymbols.indexOf(k) >= 0}
+							displayLocator={this.state.touchDragKey == k}/>;
 
 				symbols.push(c);
 				
@@ -1044,10 +1127,11 @@ RSVP.on('error', function(reason) {
 			};
 		},
 
-		button_Grab: function(i) {
+		button_Grab: function(i, pageX, pageY, localX, localY, e) {
 
 			this.setState({
 				grabScroll: this.state.scroll,
+				touchDrag: !!e.touches,
 			})
 		},
 
@@ -1101,7 +1185,7 @@ RSVP.on('error', function(reason) {
 
 
 		},
-
+		
 		button_Click: function(i) {
 			var symbol = this.props.symbolSpecs[i];
 
@@ -1204,7 +1288,8 @@ RSVP.on('error', function(reason) {
 										y={gy}
 										key="grabbedSymbol"
 										ref="grabbedSymbol"
-										spec={this.props.symbolSpecs[this.state.draggingButtonIndex]}/>
+										spec={this.props.symbolSpecs[this.state.draggingButtonIndex]}
+										displayLocator={this.state.touchDrag}/>
 
 			}
 
@@ -1259,7 +1344,61 @@ RSVP.on('error', function(reason) {
 		}
 	});
 
+	var Equation = React.createClass({
+
+		componentDidMount: function() {
+			this.updateMathJax();
+		},
+
+		componentDidUpdate: function(nextProps, nextState) {
+			this.updateMathJax();
+		},
+
+		updateMathJax: function() {
+		    MathJax.Hub.Queue(["Typeset",MathJax.Hub,"parsed-equation"]);
+		},
+
+		render: function() {
+			return <div id="parsed-equation" className="parsed-equation" dangerouslySetInnerHTML={{__html: this.props.mathML}}></div>
+		}
+	});
+
 	var Editor = React.createClass({
+
+		getInitialState: function() {
+			return {
+				parsedEquation: null,
+				unusedSymbols: [],
+			};
+		},
+
+		parser_Message: function(e) {
+			this.parser.terminate();
+
+			console.log(e.data);
+
+			this.setState({
+				parsedEquation: e.data.mathml,
+				unusedSymbols: e.data.unusedSymbols,
+			});
+		},
+
+		symbols_Change: function(symbols) {
+
+			var parserSymbols = [];
+			for (var k in symbols) {
+				parserSymbols.push(toParserSymbol(k, symbols[k]));
+			}
+
+			console.log(parserSymbols);
+
+			if (this.parser)
+				this.parser.terminate();
+
+			this.parser = new Worker("js/parser.js");
+			this.parser.onmessage = this.parser_Message;
+			this.parser.postMessage({symbols: parserSymbols});
+		},
 
 		symbol_Spawn: function(x, y, spec) {
 			var c = $(this.refs.canvas.getDOMNode());
@@ -1287,14 +1426,16 @@ RSVP.on('error', function(reason) {
 			});
 
 			rightMenuSymbolSpecs = generateStringSymbolSpecs(["α", "x", "y", "z", "m", "g"])
-			rightMenuSymbolSpecs[0].subMenu = generateStringSymbolSpecs(["α", "ϐ", "ϑ", "ϕ", "ϡ", "ϥ"])
+			rightMenuSymbolSpecs[0].subMenu = generateStringSymbolSpecs(["α", "β", "γ", "δ"])
 
 
 			var topMenuSymbolSpecs = generateStringSymbolSpecs(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]);
-
+			
+			
 			return (
 				<div className="equation-editor">
-					<CanvasComponent ref="canvas"/>
+					<CanvasComponent ref="canvas" onChange={this.symbols_Change} unusedSymbols={this.state.unusedSymbols}/>
+					<Equation mathML={this.state.parsedEquation} />
 					<SymbolMenu left={0} top={120} bottom={0} width={120} btnSize={120} symbolSpecs={leftMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn}/>
 					<SymbolMenu right={0} top={120} bottom={0} width={120} btnSize={120} symbolSpecs={rightMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn} />
 					<SymbolMenu left={0} right={0} top={0} height={120} btnSize={120} symbolSpecs={topMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn} orientation="horizontal"/>
@@ -1305,3 +1446,4 @@ RSVP.on('error', function(reason) {
 
 	return EquationEditor;
 });
+
