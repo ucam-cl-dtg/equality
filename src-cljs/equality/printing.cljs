@@ -31,6 +31,10 @@
 (defmethod mathml-inner nil [expr]
   "")
 
+(defmethod mathml-inner :type/symbol [expr]
+  (println "Should not have called mathml with expr of type symbol:" expr)
+  "")
+
 (defmethod mathml-inner :type/var [expr]
   (str "<mi id=\"" (:id expr) "\">" (:token expr) "</mi>"))
 

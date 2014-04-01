@@ -150,6 +150,18 @@
                      (if (= rtn (set input))
                        []
                        [rtn])))}
+   "horiz-line" {:apply (fn [input]
+                          ;; Take a set of entities. Find the first :line and return a list of two sets of entities. One where the line has been replaced with subtract, one where it's been replaced with :frac
+                          (let [line (first (filter #(and (isa? (:type %) :type/symbol)
+                                                          (= (:token %) :line)) input))]
+                            (if line
+                              (let [remaining-input (disj input line)]
+                                [(conj remaining-input (merge line {:token :frac
+                                                                    :symbol-count 1}))
+                                 (conj remaining-input (merge line {:token "–"
+                                                                    :symbol-count 1}))])
+                              [])))}
+
    "power" {:apply (fn [input]
 
                       ;; A potential base is any expression which has higher precedence than :type/pow
@@ -340,6 +352,14 @@
 (defn map-with-meta [f m]
   (with-meta (map f m) (meta m)))
 
+(defn compare-raw-symbol-count [a b]
+  (let [symbol-count-a (count (filter #(= (:type %) :type/symbol) (apply concat (map symbols a))))
+        symbol-count-b (count (filter #(= (:type %) :type/symbol) (apply concat (map symbols b))))]
+    (cond
+     (> symbol-count-a symbol-count-b) 1
+     (< symbol-count-a symbol-count-b) -1
+     :else 0)))
+
 (defn get-best-results [input]
   (let [input       (to-clj-input input)
         all-symbols (set (map :id (flatten (map symbols input))))
@@ -347,21 +367,28 @@
         result      (parse input)
 
 
-        ;; Sort the results by the number of items left. Smaller is better (more combined)
+        ;; Sort the results by the number of items left. Smaller is better (more combined). Then sort by number of raw symbols (not turned into var or num). Fewer is better.
 
-        best-parses (sort-by count result)
+        best-parses (sort (fn [a b]
+                            (cond
+                             (> (count a) (count b)) 1
+                             (< (count a) (count b)) -1
+                             :else (compare-raw-symbol-count a b))) result)
 
         best-result (first best-parses)
 
-        ;; Within the best result, sort by number of symbols in combined items (more is better)
+        ;; Within the best result, sort by number of symbols in combined items (more is better). Then sort by number of raw symbols (not turned into var or num). Fewer is better.
 
-        formulae    (reverse (sort-by :symbol-count best-result))
+        formulae    (sort (fn [a b] (cond
+                                    (> (:symbol-count a) (:symbol-count b)) -1
+                                    (< (:symbol-count a) (:symbol-count b)) 1
+                                    :else (let [symbol-count-a (count (filter #(= (:type %) :type/symbol) (symbols a)))
+                                                symbol-count-b (count (filter #(= (:type %) :type/symbol) (symbols b)))]
+                                            (cond
+                                             (> symbol-count-a symbol-count-b) 1
+                                             (< symbol-count-a symbol-count-b) -1
+                                             :else 0)))) best-result)
 
-        _           (println "RESULT:" result)
-
-        ;; Remove all formulae that still have symbols in them.
-
-        formulae      (filter #(empty? (filter (fn [s] (= :type/symbol s)) %)) formulae)
 
         ;; The the formula with most symbols
 
@@ -371,6 +398,7 @@
         unused-symbols (clojure.set/difference all-symbols (map :id (symbols formula)))
 
         ]
+    (println "RESULT:" formula)
 
     (clj->js {:mathml  (mathml formula)
               :unusedSymbols unused-symbols})))

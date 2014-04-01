@@ -22,3 +22,7 @@ javascripts_dir = "resources/public/js"
 # preferred_syntax = :sass
 # and then run:
 # sass-convert -R --from scss --to sass src-sass scss && rm -rf sass && mv scss sass
+
+on_stylesheet_saved do |filename|
+	STDOUT.flush
+end

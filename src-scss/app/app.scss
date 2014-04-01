@@ -5,6 +5,20 @@
 
 @import "../foundicons/general_foundicons/general_foundicons";
 
+$button-size: 120px;
+$canvas-height: 500px;
+$equation-height: 150px;
+
+
+.scss-vars {
+	display: none;
+
+	.button-size { 
+		height: $button-size; 
+	}
+
+}
+
 #mathjax-dummy {
 	 display: none;
 }
@@ -16,12 +30,15 @@
 	
 }
 
+.equation-canvas-row {
+	height: $canvas-height;
+}
+
 .equation-canvas {
-	position: absolute;
-	left: 120px;
-	right: 120px;
-	top: 120px;
-	bottom: 150px;
+
+	position: relative;
+	display:block;
+	height: 100%;
     background: white;
     font-size: 48px;
     z-index: 0;
@@ -49,6 +66,12 @@
 }
 
 .symbol-content.sqrt {
+	left: 0;
+	top: 0;
+	width: 100%;
+	height: 100%;
+}
+.symbol-content.line {
 	left: 0;
 	top: 0;
 	width: 100%;
@@ -150,7 +173,7 @@
 }
 
 .symbol-menu {
-	position: absolute;
+	position: relative;
 	background: #ced8df;
 	border: 1px solid #bec8cf;
 }
@@ -178,13 +201,41 @@
 	-webkit-transition: top 0.2s ease-out, left 0.2s ease-out;
 	transition: top 0.2s ease-out, left 0.2s ease-out;
 }
-
-.symbol-menu.vertical ul {
-	width: 100%;
+.symbol-menu.left-menu {
+	float: left;
 }
 
-.symbol-menu.horizontal ul {
+.symbol-menu.right-menu {
+	float: right;
+}
+
+.symbol-menu.vertical {
+	width: $button-size;
 	height: 100%;
+	display: inline-block;
+
+	ul {
+		width: 100%;
+	}
+
+	li {
+		width: 100%;
+	}
+}
+
+.symbol-menu.horizontal {
+	position: relative;
+	height: $button-size;
+	display:block;
+	width: 100%;
+
+	ul {
+		height: 100%;
+	}
+
+	li {
+		height: 100%;
+	}
 }
 
 .symbol-menu li {
@@ -195,14 +246,6 @@
 	padding: 0;
 }
 
-
-.symbol-menu.vertical li {
-	width: 100%;
-}
-
-.symbol-menu.horizontal li {
-	height: 100%;
-}
 
 .submenu {
 	position: absolute;
@@ -249,10 +292,9 @@
 }
 
 .parsed-equation {
-	position: absolute;
+	position: relative;
 	width: 100%;
-	height: 150px;
-	bottom: 0;
+	height: $equation-height;
 	text-align: center;
 	font-size: 48px;
 	border-top: 1px solid #bec8cf;

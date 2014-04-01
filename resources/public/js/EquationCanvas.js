@@ -143,6 +143,9 @@ RSVP.on('error', function(reason) {
 				s.spec.fontSize = Math.max(5, startSnapshot.spec.fontSize + Math.max(totalDx, totalDy) * 4);
 				
 				break;
+			case "line":
+				s.spec.length = Math.max(5, startSnapshot.spec.length + Math.max(totalDx, totalDy));
+				break;
 			case "container":
 				
 				var newTotalDx = Math.max(totalDx, 10 - startSnapshot.spec.width);
@@ -173,6 +176,15 @@ RSVP.on('error', function(reason) {
 	    		r.width = bounds.width;
 	    		r.height = bounds.height;
 	    		r.token = s.spec.token;
+
+				break;
+			case "line":
+
+				r.top = s.x - s.spec.length / 40;
+				r.left = s.x - s.spec.length / 2;
+				r.width = s.spec.length;
+				r.height = s.spec.length / 20;
+				r.token = ":line";
 
 				break;
 			case "container":
@@ -462,6 +474,71 @@ RSVP.on('error', function(reason) {
 		}
 	});
 
+	var LineSymbol = React.createClass({
+
+		mixins: [Mountable],
+
+		statics: {
+			getBounds: function(props) {
+				return {
+					left: props.x - props.spec.length / 2,
+					top: props.y - props.spec.length / 40,
+					width: props.spec.length,
+					height: props.spec.length / 20,
+				};
+			},
+		},
+
+		redraw: function() {
+			var n = $(this.refs.canvas.getDOMNode())
+			var width = n.width();
+			var height = n.height();
+
+			n.attr({width: width, height: height});
+
+			var ctx = n[0].getContext("2d");
+			ctx.lineWidth = Math.max(1.5, width / 40);
+			ctx.strokeStyle = n.css("color");
+
+			ctx.beginPath();
+			ctx.moveTo(ctx.lineWidth,0.5 * height);
+			ctx.lineTo(width - ctx.lineWidth, 0.5 * height);
+			ctx.stroke();
+		},
+
+		componentDidMount: function() {
+			this.redraw();
+		},
+
+		componentDidUpdate: function() {
+			this.redraw();
+		},
+
+		render: function() {
+
+    		var classes = React.addons.classSet({
+    			symbol: true,
+    			selected: this.props.selected,
+    			unused: this.props.unused,
+    		});
+
+			return (
+				<div className={classes} 
+					style={{
+						width: this.props.spec.length,
+						height: Math.max(20, this.props.spec.length / 20),
+						left: this.props.x - this.props.spec.length / 2,
+						top: this.props.y - Math.max(10, this.props.spec.length / 40),
+					}}>
+
+					<canvas className="symbol-content line" 
+						ref="canvas" />
+
+				</div>
+			);
+		}
+	});
+
 	var ContainerSymbol = React.createClass({
 
 		statics: {
@@ -485,6 +562,7 @@ RSVP.on('error', function(reason) {
 		statics: {
 			symbolTypeMap: {
 				"string": TextSymbol,
+				"line": LineSymbol,
 				"container": ContainerSymbol
 			},
 			getBounds: function(props) {
@@ -640,8 +718,8 @@ RSVP.on('error', function(reason) {
 		getInitialState: function() {
 			return {
 				symbols: {
-					"sym-a": {selected: true, x:200, y:200, spec: {type: "string", fontSize: 48, token: "x"}},
-					"sym-b": {selected: true, x:300, y:200, spec: {type: "container", subType: "sqrt", width: 100, height: 100}},
+//					"sym-a": {selected: true, x:200, y:200, spec: {type: "string", fontSize: 48, token: "x"}},
+//					"sym-b": {selected: true, x:300, y:200, spec: {type: "container", subType: "sqrt", width: 100, height: 100}},
 				},
 				inputBox: null,
 				draggingSymbols: null,
@@ -1114,9 +1192,10 @@ RSVP.on('error', function(reason) {
 
 		getDefaultProps: function() {
 			return {
-				btnSize: 80,
+				btnSize: $(".scss-vars .button-size").height(),
 				orientation: "vertical",
 				symbolSpecs: [],
+				className: "",
 			};
 		},
 
@@ -1229,8 +1308,8 @@ RSVP.on('error', function(reason) {
 
 			var symbols = [];
 
-			var btnWidth = this.props.orientation == "vertical" ? this.props.width : this.props.btnSize;
-			var btnHeight = this.props.orientation == "vertical" ? this.props.btnSize : this.props.height;
+			var btnWidth = this.props.btnSize; //this.props.orientation == "vertical" ? this.props.width : this.props.btnSize;
+			var btnHeight = this.props.btnSize; //this.props.orientation == "vertical" ? this.props.btnSize : this.props.height;
 
 			for (var i = 0; i < this.props.symbolSpecs.length; i++) {
 				
@@ -1301,13 +1380,11 @@ RSVP.on('error', function(reason) {
 			}
 
 			return (
-				<div className={"symbol-menu " + this.props.orientation} style={{
+				<div className={"symbol-menu " + this.props.orientation + " " + this.props.className} style={{
 						left: this.props.left,
 						top: this.props.top,
 						right: this.props.right,
-						bottom: this.props.bottom,
-						width: this.props.width,
-						height: this.props.height,}}>
+						bottom: this.props.bottom}}>
 					<div className="list-container" >
 						<ul ref="list" style={style} className={(this.state.scrolling ? "scrolling" : "")}>
 							{symbols}
@@ -1338,7 +1415,7 @@ RSVP.on('error', function(reason) {
 			return (
 				<div className="submenu" style={{right: "100%"}}>
 					<div className="submenu-background" ref="background" />
-					<SymbolMenu ref="menu" right={0} width={120} top={0} bottom={0} btnSize={120} symbolSpecs={this.props.symbolSpecs} onSpawnSymbol={this.props.onSpawnSymbol}/>
+					<SymbolMenu ref="menu" className="right-menu" symbolSpecs={this.props.symbolSpecs} onSpawnSymbol={this.props.onSpawnSymbol}/>
 				</div>
 			);
 		}
@@ -1390,8 +1467,6 @@ RSVP.on('error', function(reason) {
 				parserSymbols.push(toParserSymbol(k, symbols[k]));
 			}
 
-			console.log(parserSymbols);
-
 			if (this.parser)
 				this.parser.terminate();
 
@@ -1417,7 +1492,11 @@ RSVP.on('error', function(reason) {
 		render: function() {
 			
 
-			var leftMenuSymbolSpecs = generateStringSymbolSpecs(["+", "–", "/", "="]);
+			var leftMenuSymbolSpecs = generateStringSymbolSpecs(["+", "="]);
+			leftMenuSymbolSpecs.push({
+				type: "line",
+				length: 48,
+			});
 			leftMenuSymbolSpecs.push({
 				type: "container",
 				width: 48,
@@ -1431,16 +1510,19 @@ RSVP.on('error', function(reason) {
 
 			var topMenuSymbolSpecs = generateStringSymbolSpecs(["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]);
 			
-			
 			return (
 				<div className="equation-editor">
-					<CanvasComponent ref="canvas" onChange={this.symbols_Change} unusedSymbols={this.state.unusedSymbols}/>
-					<Equation mathML={this.state.parsedEquation} />
-					<SymbolMenu left={0} top={120} bottom={0} width={120} btnSize={120} symbolSpecs={leftMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn}/>
-					<SymbolMenu right={0} top={120} bottom={0} width={120} btnSize={120} symbolSpecs={rightMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn} />
-					<SymbolMenu left={0} right={0} top={0} height={120} btnSize={120} symbolSpecs={topMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn} orientation="horizontal"/>
+					<SymbolMenu className="top-menu" symbolSpecs={topMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn} orientation="horizontal"/>
+					<div className="equation-canvas-row">
+						<SymbolMenu className="left-menu" orientation="vertical" symbolSpecs={leftMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn}/>
+	                    <SymbolMenu className="right-menu" orientation="vertical" symbolSpecs={rightMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn} />
+	                    <CanvasComponent ref="canvas" onChange={this.symbols_Change} unusedSymbols={this.state.unusedSymbols}/>
+					</div>
+                    <Equation mathML={this.state.parsedEquation} />	
 				</div>
+
 			);
+
 		}
 	});
 
