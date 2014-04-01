@@ -144,7 +144,10 @@ RSVP.on('error', function(reason) {
 				
 				break;
 			case "line":
-				s.spec.length = Math.max(5, startSnapshot.spec.length + Math.max(totalDx, totalDy));
+				var newTotalDx = Math.max(totalDx, 10 - startSnapshot.spec.length);
+
+				s.x = startSnapshot.x + newTotalDx / 2;
+				s.spec.length = Math.max(5, startSnapshot.spec.length + newTotalDx);
 				break;
 			case "container":
 				
@@ -180,7 +183,7 @@ RSVP.on('error', function(reason) {
 				break;
 			case "line":
 
-				r.top = s.x - s.spec.length / 40;
+				r.top = s.y - s.spec.length / 40;
 				r.left = s.x - s.spec.length / 2;
 				r.width = s.spec.length;
 				r.height = s.spec.length / 20;
@@ -197,6 +200,9 @@ RSVP.on('error', function(reason) {
 				switch(s.spec.subType) {
 					case "sqrt":
 						r.token = ":sqrt";
+						break;
+					case "brackets":
+						r.token = ":brackets";
 						break;
 				}
 
@@ -402,6 +408,71 @@ RSVP.on('error', function(reason) {
 		}
 	});
 
+	var LineSymbol = React.createClass({
+
+		mixins: [Mountable],
+
+		statics: {
+			getBounds: function(props) {
+				return {
+					left: props.x - props.spec.length / 2,
+					top: props.y - props.spec.length / 40,
+					width: props.spec.length,
+					height: props.spec.length / 20,
+				};
+			},
+		},
+
+		redraw: function() {
+			var n = $(this.refs.canvas.getDOMNode())
+			var width = n.width();
+			var height = n.height();
+
+			n.attr({width: width, height: height});
+
+			var ctx = n[0].getContext("2d");
+			ctx.lineWidth = Math.min(3, Math.max(1.5, width / 40));
+			ctx.strokeStyle = n.css("color");
+
+			ctx.beginPath();
+			ctx.moveTo(ctx.lineWidth,0.5 * height);
+			ctx.lineTo(width - ctx.lineWidth, 0.5 * height);
+			ctx.stroke();
+		},
+
+		componentDidMount: function() {
+			this.redraw();
+		},
+
+		componentDidUpdate: function() {
+			this.redraw();
+		},
+
+		render: function() {
+
+    		var classes = React.addons.classSet({
+    			symbol: true,
+    			selected: this.props.selected,
+    			unused: this.props.unused,
+    		});
+
+			return (
+				<div className={classes} 
+					style={{
+						width: this.props.spec.length,
+						height: Math.max(20, this.props.spec.length / 20),
+						left: this.props.x - this.props.spec.length / 2,
+						top: this.props.y - Math.max(10, this.props.spec.length / 40),
+					}}>
+
+					<canvas className="symbol-content line" 
+						ref="canvas" />
+
+				</div>
+			);
+		}
+	});
+
 	var SqrtSymbol = React.createClass({
 
 		mixins: [Mountable],
@@ -474,17 +545,17 @@ RSVP.on('error', function(reason) {
 		}
 	});
 
-	var LineSymbol = React.createClass({
+	var BracketsSymbol = React.createClass({
 
 		mixins: [Mountable],
 
 		statics: {
 			getBounds: function(props) {
 				return {
-					left: props.x - props.spec.length / 2,
-					top: props.y - props.spec.length / 40,
-					width: props.spec.length,
-					height: props.spec.length / 20,
+					left: props.x - props.spec.width / 2,
+					top: props.y - props.spec.height / 2,
+					width: props.spec.width,
+					height: props.spec.height,
 				};
 			},
 		},
@@ -497,12 +568,21 @@ RSVP.on('error', function(reason) {
 			n.attr({width: width, height: height});
 
 			var ctx = n[0].getContext("2d");
-			ctx.lineWidth = Math.max(1.5, width / 40);
+			ctx.lineWidth = Math.max(1.5, height / 50);
 			ctx.strokeStyle = n.css("color");
 
 			ctx.beginPath();
-			ctx.moveTo(ctx.lineWidth,0.5 * height);
-			ctx.lineTo(width - ctx.lineWidth, 0.5 * height);
+
+			ctx.moveTo(0.2 * height, ctx.lineWidth);
+			ctx.quadraticCurveTo(0, 0.5*height, 0.2*height, height - ctx.lineWidth);
+			ctx.moveTo(0.2 * height, ctx.lineWidth);
+			ctx.quadraticCurveTo(1.5*ctx.lineWidth, 0.5*height, 0.2*height, height - ctx.lineWidth);
+
+			ctx.moveTo(width - 0.2 * height, ctx.lineWidth);
+			ctx.quadraticCurveTo(width, 0.5*height, width - 0.2*height, height - ctx.lineWidth);
+			ctx.moveTo(width - 0.2 * height, ctx.lineWidth);
+			ctx.quadraticCurveTo(width - 1.5*ctx.lineWidth, 0.5*height, width - 0.2*height, height - ctx.lineWidth);
+
 			ctx.stroke();
 		},
 
@@ -518,6 +598,7 @@ RSVP.on('error', function(reason) {
 
     		var classes = React.addons.classSet({
     			symbol: true,
+    			container: true,
     			selected: this.props.selected,
     			unused: this.props.unused,
     		});
@@ -525,13 +606,13 @@ RSVP.on('error', function(reason) {
 			return (
 				<div className={classes} 
 					style={{
-						width: this.props.spec.length,
-						height: Math.max(20, this.props.spec.length / 20),
-						left: this.props.x - this.props.spec.length / 2,
-						top: this.props.y - Math.max(10, this.props.spec.length / 40),
+						width: this.props.spec.width,
+						height: this.props.spec.height,
+						left: this.props.x - this.props.spec.width / 2,
+						top: this.props.y - this.props.spec.height / 2,
 					}}>
 
-					<canvas className="symbol-content line" 
+					<canvas className="symbol-content brackets" 
 						ref="canvas" />
 
 				</div>
@@ -544,6 +625,7 @@ RSVP.on('error', function(reason) {
 		statics: {
 			symbolSubTypeMap: {
 				"sqrt": SqrtSymbol,
+				"brackets": BracketsSymbol,
 			},
 			getBounds: function(props) {
 				return ContainerSymbol.symbolSubTypeMap[props.spec.subType].getBounds(props);
@@ -1462,17 +1544,25 @@ RSVP.on('error', function(reason) {
 
 		symbols_Change: function(symbols) {
 
-			var parserSymbols = [];
-			for (var k in symbols) {
-				parserSymbols.push(toParserSymbol(k, symbols[k]));
-			}
+			if (this.parseTimeout)
+				window.clearTimeout(this.parseTimeout);
 
-			if (this.parser)
-				this.parser.terminate();
+			var self = this;
 
-			this.parser = new Worker("js/parser.js");
-			this.parser.onmessage = this.parser_Message;
-			this.parser.postMessage({symbols: parserSymbols});
+			this.parseTimeout = window.setTimeout(function() {
+				var parserSymbols = [];
+				for (var k in symbols) {
+					parserSymbols.push(toParserSymbol(k, symbols[k]));
+				}
+
+				if (self.parser)
+					self.parser.terminate();
+				console.log("Launching:", parserSymbols);
+
+				self.parser = new Worker("js/parser.js");
+				self.parser.onmessage = self.parser_Message;
+				self.parser.postMessage({symbols: parserSymbols});
+			}, 500);
 		},
 
 		symbol_Spawn: function(x, y, spec) {
@@ -1496,6 +1586,12 @@ RSVP.on('error', function(reason) {
 			leftMenuSymbolSpecs.push({
 				type: "line",
 				length: 48,
+			});
+			leftMenuSymbolSpecs.push({
+				type: "container",
+				width: 48,
+				height: 36,
+				subType: "brackets",
 			});
 			leftMenuSymbolSpecs.push({
 				type: "container",

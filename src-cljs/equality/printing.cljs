@@ -62,5 +62,8 @@
 (defmethod mathml-inner :type/sqrt [expr]
   (str "<msqrt id=\"" (:id expr) "\">" (mathml-inner (:radicand expr)) "</msqrt>"))
 
+(defmethod mathml-inner :type/bracket [expr]
+  (str "<mfenced id=\"" (:id expr) "\"><mrow>" (mathml-inner (:child expr)) "</mrow></mfenced>"))
+
 (defn mathml [expr]
   (str "<math display=\"block\"><mrow>" (mathml-inner expr) "</mrow></math>"))
