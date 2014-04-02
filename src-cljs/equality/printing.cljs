@@ -3,10 +3,16 @@
 (defmulti expr-str :type)
 
 (defmethod expr-str :default [expr]
+  (str "_" (:token expr)))
+
+(defmethod expr-str :type/num [expr]
+  (str (:token expr)))
+
+(defmethod expr-str :type/var [expr]
   (str (:token expr)))
 
 (defmethod expr-str :type/pow [expr]
-  (str (expr-str (:base expr)) "^(" (expr-str (:exponent expr)) ")"))
+  (str (expr-str (:base expr)) "^[" (expr-str (:exponent expr)) "]"))
 
 (defmethod expr-str :type/add [expr]
   (str (expr-str (:left-op expr)) " + " (expr-str (:right-op expr))))
@@ -15,13 +21,16 @@
   (str (expr-str (:left-op expr)) " - " (expr-str (:right-op expr))))
 
 (defmethod expr-str :type/mult [expr]
-  (str "(" (expr-str (:left-op expr)) (expr-str (:right-op expr)) ")"))
+  (str "[" (expr-str (:left-op expr)) (expr-str (:right-op expr)) "]"))
 
 (defmethod expr-str :type/eq [expr]
   (str (expr-str (:left-op expr)) " = " (expr-str (:right-op expr))))
 
 (defmethod expr-str :type/frac [expr]
-  (str "(" (expr-str (:numerator expr)) ") / (" (expr-str (:denominator expr)) ")"))
+  (str "[" (expr-str (:numerator expr)) "] / [" (expr-str (:denominator expr)) "]"))
+
+(defmethod expr-str :type/bracket [expr]
+  (str "(" (expr-str (:child expr)) ")"))
 
 (defn print-expr [expr]
   (js/console.log (expr-str expr)))
@@ -66,4 +75,5 @@
   (str "<mfenced id=\"" (:id expr) "\"><mrow>" (mathml-inner (:child expr)) "</mrow></mfenced>"))
 
 (defn mathml [expr]
-  (str "<math display=\"block\"><mrow>" (mathml-inner expr) "</mrow></math>"))
+  (when expr
+    (str "<math display=\"block\"><mrow>" (mathml-inner expr) "</mrow></math>")))

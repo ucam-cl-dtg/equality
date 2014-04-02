@@ -9,7 +9,6 @@ $button-size: 120px;
 $canvas-height: 500px;
 $equation-height: 150px;
 
-
 .scss-vars {
 	display: none;
 
@@ -302,7 +301,18 @@ $equation-height: 150px;
 	width: 100%;
 	height: $equation-height;
 	text-align: center;
-	font-size: 48px;
+	font-size: 32px;
 	border-top: 1px solid #bec8cf;
 	background-color: #eef8ff;
+}
+
+.loading {
+	position: absolute;
+	width: 64px;
+	height: 64px;
+	left: 50%;
+	top: 50%;
+	margin-left: -32px;
+	margin-top: -32px;
+	opacity: 0.5;
 }

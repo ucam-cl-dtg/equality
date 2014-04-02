@@ -799,10 +799,7 @@ RSVP.on('error', function(reason) {
 
 		getInitialState: function() {
 			return {
-				symbols: {
-//					"sym-a": {selected: true, x:200, y:200, spec: {type: "string", fontSize: 48, token: "x"}},
-//					"sym-b": {selected: true, x:300, y:200, spec: {type: "container", subType: "sqrt", width: 100, height: 100}},
-				},
+				symbols: { },
 				inputBox: null,
 				draggingSymbols: null,
 				selectionBox: null,
@@ -1506,11 +1503,16 @@ RSVP.on('error', function(reason) {
 	var Equation = React.createClass({
 
 		componentDidMount: function() {
+			$(this.refs.panel.getDOMNode()).append($(".circularG_container").clone());
 			this.updateMathJax();
 		},
 
-		componentDidUpdate: function(nextProps, nextState) {
+		componentDidUpdate: function(prevProps, prevState) {
 			this.updateMathJax();
+
+			if(!this.props.mathML) {
+				$(this.refs.panel.getDOMNode()).append($(".circularG_container").clone().show());
+			}
 		},
 
 		updateMathJax: function() {
@@ -1518,7 +1520,10 @@ RSVP.on('error', function(reason) {
 		},
 
 		render: function() {
-			return <div id="parsed-equation" className="parsed-equation" dangerouslySetInnerHTML={{__html: this.props.mathML}}></div>
+			return (
+				<div id="parsed-equation" ref="panel" className="parsed-equation" dangerouslySetInnerHTML={{__html: this.props.loading ? "<img class=\"loading\" src=\"images/loading.gif\" />" : this.props.mathML }}>
+				</div>
+			);
 		}
 	});
 
@@ -1532,11 +1537,13 @@ RSVP.on('error', function(reason) {
 		},
 
 		parser_Message: function(e) {
-			this.parser.terminate();
+			//this.parser.terminate();
 
+			console.timeEnd("Parsing");
 			console.log(e.data);
 
 			this.setState({
+				loadingEquation: false,
 				parsedEquation: e.data.mathml,
 				unusedSymbols: e.data.unusedSymbols,
 			});
@@ -1548,6 +1555,9 @@ RSVP.on('error', function(reason) {
 				window.clearTimeout(this.parseTimeout);
 
 			var self = this;
+			self.setState({
+				loadingEquation: true,
+			})
 
 			this.parseTimeout = window.setTimeout(function() {
 				var parserSymbols = [];
@@ -1555,14 +1565,23 @@ RSVP.on('error', function(reason) {
 					parserSymbols.push(toParserSymbol(k, symbols[k]));
 				}
 
+				parserSymbols = [{"id":"sym-0","type":"type/symbol","top":172.5,"left":261,"width":26,"height":23,"token":"x"},{"id":"sym-1","type":"type/symbol","top":166,"left":297,"width":34,"height":34,"token":"+"},{"id":"sym-2","type":"type/symbol","top":166.5,"left":338.5,"width":25,"height":33,"token":"y"},{"id":"sym-3","type":"type/symbol","top":214.8,"left":231,"width":168,"height":8.4,"token":":line"},{"id":"sym-4","type":"type/symbol","top":230.3125,"left":270,"width":22,"height":35,"token":"3"},{"id":"sym-5","type":"type/symbol","top":150,"left":239,"width":143,"height":58,"token":":brackets"},{"id":"sym-6","type":"type/symbol","top":213,"left":409.5,"width":35,"height":14,"token":"="},{"id":"sym-7","type":"type/symbol","top":193.8125,"left":474,"width":24,"height":36,"token":"7"},{"id":"sym-8","type":"type/symbol","top":205.5,"left":498,"width":26,"height":23,"token":"x"},{"id":"sym-9","type":"type/symbol","top":188.3125,"left":531,"width":14,"height":21,"token":"3"},{"id":"sym-10","type":"type/symbol","top":246.3,"left":297,"width":28,"height":1.4,"token":":line"},{"id":"sym-11","type":"type/symbol","top":232.5,"left":333,"width":26,"height":25,"token":"α"},{"id":"sym-12","type":"type/symbol","top":185.5,"left":544.5,"width":11,"height":23,"token":"i"}];
+				//parserSymbols = [{"id":"sym-0","type":"type/symbol","top":172.5,"left":261,"width":26,"height":23,"token":"x"},{"id":"sym-1","type":"type/symbol","top":166,"left":297,"width":34,"height":34,"token":"+"},{"id":"sym-2","type":"type/symbol","top":166.5,"left":338.5,"width":25,"height":33,"token":"y"},{"id":"sym-3","type":"type/symbol","top":214.8,"left":231,"width":168,"height":8.4,"token":":line"},{"id":"sym-4","type":"type/symbol","top":230.3125,"left":311,"width":22,"height":35,"token":"3"},{"id":"sym-5","type":"type/symbol","top":150,"left":239,"width":143,"height":58,"token":":brackets"},{"id":"sym-6","type":"type/symbol","top":213,"left":409.5,"width":35,"height":14,"token":"="},{"id":"sym-7","type":"type/symbol","top":193.8125,"left":474,"width":24,"height":36,"token":"7"}];
+				//parserSymbols = [{"id":"sym-0","type":"type/symbol","top":172.5,"left":261,"width":26,"height":23,"token":"1"},{"id":"sym-1","type":"type/symbol","top":166,"left":297,"width":34,"height":34,"token":"+"},{"id":"sym-2","type":"type/symbol","top":166.5,"left":338.5,"width":25,"height":33,"token":"y"}];
+
 				if (self.parser)
 					self.parser.terminate();
-				console.log("Launching:", parserSymbols);
+
+				console.clear();
+				console.log("Parsing...", JSON.stringify(parserSymbols));
+				console.time("Parsing");
+
+
 
 				self.parser = new Worker("js/parser.js");
 				self.parser.onmessage = self.parser_Message;
 				self.parser.postMessage({symbols: parserSymbols});
-			}, 500);
+			}, 100);
 		},
 
 		symbol_Spawn: function(x, y, spec) {
@@ -1614,11 +1633,10 @@ RSVP.on('error', function(reason) {
 	                    <SymbolMenu className="right-menu" orientation="vertical" symbolSpecs={rightMenuSymbolSpecs} onSpawnSymbol={this.symbol_Spawn} />
 	                    <CanvasComponent ref="canvas" onChange={this.symbols_Change} unusedSymbols={this.state.unusedSymbols}/>
 					</div>
-                    <Equation mathML={this.state.parsedEquation} />	
+                    <Equation mathML={this.state.parsedEquation} loading={this.state.loadingEquation}/>	
 				</div>
 
 			);
-
 		}
 	});
 
