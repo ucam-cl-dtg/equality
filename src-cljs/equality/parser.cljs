@@ -44,34 +44,34 @@
   [expr])
 
 (defmethod symbols :type/num [expr]
-  [expr])
+  [(symbols (:src expr))])
 
 (defmethod symbols :type/var [expr]
-  [expr])
+  [(symbols (:src expr))])
 
 (defmethod symbols :type/add [expr]
-  (concat [expr] (symbols (:left-op expr)) (symbols (:right-op expr))))
+  (concat [(symbols (:src expr))] (symbols (:left-op expr)) (symbols (:right-op expr))))
 
 (defmethod symbols :type/sub [expr]
-  (concat [expr] (symbols (:left-op expr)) (symbols (:right-op expr))))
+  (concat [(symbols (:src expr))] (symbols (:left-op expr)) (symbols (:right-op expr))))
 
 (defmethod symbols :type/mult [expr]
-  (concat (symbols (:left-op expr)) (symbols (:right-op expr)) (when (:id expr) [expr])))
+  (concat (symbols (:left-op expr)) (symbols (:right-op expr)) (when (:id expr) [(symbols (:src expr))])))
 
 (defmethod symbols :type/eq [expr]
-  (concat [expr] (symbols (:left-op expr)) (symbols (:right-op expr))))
+  (concat [(symbols (:src expr))] (symbols (:left-op expr)) (symbols (:right-op expr))))
 
 (defmethod symbols :type/frac [expr]
-  (concat [expr] (symbols (:numerator expr)) (symbols (:denominator expr))))
+  (concat [(symbols (:src expr))] (symbols (:numerator expr)) (symbols (:denominator expr))))
 
 (defmethod symbols :type/pow [expr]
   (concat (symbols (:base expr)) (symbols (:exponent expr))))
 
 (defmethod symbols :type/sqrt [expr]
-  (concat [expr] (symbols (:radicand expr))))
+  (concat [(symbols (:src expr))] (symbols (:radicand expr))))
 
 (defmethod symbols :type/bracket [expr]
-  (concat [expr] (symbols (:child expr))))
+  (concat [(symbols (:src expr))] (symbols (:child expr))))
 
 (defn numeric? [str]
   (not (js/isNaN (js/parseFloat str))))
@@ -112,6 +112,7 @@
                  ;; Now we have the left and right operands, create a new result set combining them with the appropriate operator.
                  (conj remaining-input (merge {:id (:id t)
                                                :type type
+                                               :src t
                                                :left-op left
                                                :right-op right
                                                :symbol-count (+ 1
@@ -133,8 +134,9 @@
                                          (if (and (isa? (:type potential-num) :type/symbol)
                                                   (numeric? (:token potential-num)))
                                            ;; Replace
-                                           (merge potential-num {:type :type/num
-                                                                 :symbol-count 1})
+                                           (with-meta (merge potential-num {:type :type/num
+                                                                            :src potential-num
+                                                                            :symbol-count 1}) {:certain true})
                                            ;; Do not replace
                                            potential-num)) input))]
                      (if (= rtn (set input))
@@ -149,8 +151,9 @@
                                                   (= (count (:token potential-var)) 1)
                                                   (not (contains? non-var-symbols (:token potential-var))))
                                            ;; Replace
-                                           (merge potential-var {:type :type/var
-                                                                 :symbol-count 1})
+                                           (with-meta (merge potential-var {:type :type/var
+                                                                            :src potential-var
+                                                                            :symbol-count 1}) {:certain true})
                                            ;; Do not replace
                                            potential-var)) input))]
                      (if (= rtn (set input))
@@ -163,8 +166,10 @@
                             (if line
                               (let [remaining-input (disj input line)]
                                 [(conj remaining-input (merge line {:token :frac
+                                                                    :src line
                                                                     :symbol-count 1}))
                                  (conj remaining-input (merge line {:token "-"
+                                                                    :src line
                                                                     :symbol-count 1}))])
                               [])))}
 
@@ -217,7 +222,7 @@
                                                                 potential-right-ops (filter #(and (geom/boxes-intersect? (geom/right-box left (* 1.5 (min (:width left) (:width %))) (* 0.3 (:height left))) %)
                                                                                                   (> (:left %) (- (geom/bbox-right left) (* 0.5 (:width %))))
                                                                                                   (> (:left %) (:x (geom/bbox-middle left)))
-                                                                                                  (if (= (:type left) :type/pow)
+                                                                                                  #_(if (= (:type left) :type/pow)
                                                                                                     (> (geom/bbox-bottom %) (:y (geom/bbox-middle (:base left))))
                                                                                                     (> (geom/bbox-bottom %) (:y (geom/bbox-middle left))))
                                                                                                   (>= (precedence (:type %)) (precedence :type/mult))
@@ -281,6 +286,7 @@
                                                        :let [remaining-input (disj remaining-input numerator denominator)]]
                                                    (conj remaining-input (merge {:id (:id t)
                                                                                  :type :type/frac
+                                                                                 :src t
                                                                                  :numerator numerator
                                                                                  :denominator denominator
                                                                                  :symbol-count (+ 1
@@ -298,11 +304,12 @@
                                                  :when (= 1 (count potential-radicands))]
                                              (for [radicand potential-radicands
                                                    :let [remaining-input (disj remaining-input radicand)]]
-                                               (conj remaining-input (merge {:id (:id r)
-                                                                             :type :type/sqrt
-                                                                             :radicand radicand
-                                                                             :symbol-count (+ 1 (:symbol-count radicand))}
-                                                                            (geom/bbox-combine r radicand)))))]
+                                               (conj remaining-input (with-meta (merge {:id (:id r)
+                                                                                        :type :type/sqrt
+                                                                                        :src r
+                                                                                        :radicand radicand
+                                                                                        :symbol-count (+ 1 (:symbol-count radicand))}
+                                                                                       (geom/bbox-combine r radicand)) {:certain true}))))]
                       (apply concat result-sets-list)))}
    "brackets" {:apply (fn [input]
                         (let [brackets (filter #(and (isa? (:type %) :type/symbol)
@@ -314,138 +321,57 @@
                                                      :when (= 1 (count potential-children))]
                                                  (for [child potential-children
                                                        :let [remaining-input (disj remaining-input child)]]
-                                                   (conj remaining-input (merge {:id (:id b)
-                                                                                 :type :type/bracket
-                                                                                 :child child
-                                                                                 :symbol-count (+ 1 (:symbol-count child))}
-                                                                                (geom/bbox-combine b child)))))]
+                                                   (conj remaining-input (with-meta (merge {:id (:id b)
+                                                                                            :type :type/bracket
+                                                                                            :src b
+                                                                                            :child child
+                                                                                            :symbol-count (+ 1 (:symbol-count child))}
+                                                                                           (geom/bbox-combine b child)) {:certain true}))))]
                           (apply concat result-sets-list)))}})
 
-
-
-(defn my-mem [f]
-  (let [cache (atom {})]
-    (fn [input]
-      (if-let [k (some (fn [k] (if (clojure.set/subset? k input) k nil)) (keys @cache))]
-
-        (do (println "Serving result from cache!" k ":::" (get @cache k)) (get @cache k))
-
-        (let [result-sets (f input)
-              symbols-relied-on (clojure.set/difference input (apply clojure.set/union result-sets))]
-          (println "Going from" input "to" result-sets ", relied on" symbols-relied-on)
-          (when (not-empty symbols-relied-on)
-            (swap! cache #(assoc % symbols-relied-on result-sets)))
-          result-sets)))))
-
-(def mem-rules
-  (apply merge (for [k (keys rules)]
-                 {k {:apply (memoize (:apply (get rules k)))}})))
-;; The parse function takes an input set of items, each of which might be a symbol,
-;; expression or equation etc., and attempts to combine them using the rules defined above.
-;; This process will produce many possible output sets of items, with rules applied (or not) in various orders.
-;; Returns a list of output sets of items.
-
-(declare parse)
-(def parse
-  (memoize
-   (fn [input]
-
-     ;; For every rule, apply it to the input list
-
-     (let [rule-outputs (for [[k r] rules
-                          :let [new-inputs ((:apply r) input)]
-                          :when (not-empty new-inputs)]
-
-                          ;; new-inputs is now a list of result-sets. Each result set is a
-                          ;; transformation of the original input, hopefully with some
-                          ;; items combined by this rule.
-
-                          ;; Parse each of these new result sets, in the hope of
-                          ;; reducing them even further.
-                          (let [new-inputs-parsed (for [i new-inputs]
-                                                    (parse i))]
-
-                            ;; new-inputs-parsed has an element for each of the new result sets.
-                            ;; Each element is a list of output sets, so join these elements together,
-                            ;; returning a full list of output sets that we might end up with after
-                            ;; applying this rule.
-                            (apply concat new-inputs-parsed)))]
-
-       ;; rule-outputs is a list, where each element is a list of output sets derived from applying some rule.
-       ;; Join all these lists together into one full list of possible output sets from all rules.
-       ;; Remove duplicates which have arisen from applying rules in different orders with identical results.
-       ;; Add the original input to this set of valid parses, and return.
-       (cons input (distinct (apply concat rule-outputs)))))))
-
-
-(declare parse2)
-(def parse2
-  (fn [input]
-
-    (let [one-app (apply concat [input] (for [[k r] mem-rules]
-                                          ((:apply r) input)))]
-      (sort-by count one-app))))
-
-
-(defn parse5
-  "Takes a list of sets and returns a list of sets"
-  [input]
-  (let [results (apply concat (map parse2 input))]
-    (distinct results)))
-
-(defn parse6 [input]
-  (loop [last-sets nil
-         sets (list input)]
-    (let [sorted-sets (sort-by count sets)
-          min-trees   (count (first sorted-sets))]
-      (println "Sorted Sets (Best" min-trees "):" sorted-sets)
-      (if (= sets last-sets)
-        (take-while #(= min-trees (count %)) sorted-sets) ;; We have reached a fixed point.
-        (if (= 1 min-trees)
-          (take-while #(= 1 (count %)) sorted-sets) ;; We have found at least one parse that uses all symbols
-          (recur sets (parse5 sorted-sets)))))))
-
-(defn parse7 [input]
+(defn parse [input]
   (loop [i 0
-         [head & rest :as full-input] [input]]
-    (when head
-      (when (= 1 (count head))
-        (do
-          (println "Found result after" i "passes. (Queue length" (count full-input) ")")
-          (take-while #(= 1 (count %)) full-input)) ;; We have found at least one parse using all symbols
-        )
-
-
-      (let [head-results (apply concat (for [[k r] mem-rules] ((:apply r) head)))
-            sorted-results (sort-by count head-results)]
-      ;; (println "Head (" (count head) "items):" head)
-      ;; (println "Sorted results:" sorted-results)
-        (if (> i 300000)
-          [head]
-          (recur (inc i) (sort-by count (distinct (concat rest sorted-results)))))))))
-
-(defn parse8 [input]
-  (loop [i 0
+         j 0
          seen {}
          results #{}
+         certain #{}
          [head & rest :as full-input] [input]]
     (let [level (:level (meta head))
           parent (:parent (meta head))
-          head-results (apply concat (for [[k r] mem-rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
-          head-results (filter (fn [result] (not (contains? seen result))) head-results)]
+          head-results (apply concat (for [[k r] rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
+          head-results (filter (fn [result] (not (contains? seen result))) head-results)
+
+          new-certain-symbols (clojure.set/difference (set (apply concat (map (fn [result] (filter (fn [sym] (:certain (meta sym))) result)) head-results))) certain)
+          first-new-certain (first new-certain-symbols)
+
+          new-certain (conj certain first-new-certain)
+
+          head-results (if first-new-certain
+                         (filter (fn [result] (every? #(contains? result %) new-certain)) head-results)
+                         head-results)
+
+          ]
 
       (if (= 1 (count head))
-        (print "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
-        ;;(print "Level" level ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent (if (empty? head-results) "BACKTRACKING" ""))
+        (println "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
+        (print "Level" level ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent (if (empty? head-results) "BACKTRACKING" ""))
         )
+
+      (when first-new-certain
+        (println "New certain expr:" first-new-certain))
       (if (and head (< (count results) 100))
         (recur (inc i)
+               j
                (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
                (if (= 1 (count head))
                  (conj results (first head))
                  results)
+               new-certain
                (sort-by count (distinct (concat rest head-results))))
-        [results]))))
+        (do
+          (println "Finished searching" i "sets.")
+          ;;(println (contains? #{"a" "b"} nil))
+          results)))))
 
 
 (defn to-clj-input [input]
@@ -474,7 +400,7 @@
   (let [input       (to-clj-input input)
         all-symbols (set (map :id (flatten (map symbols input))))
 
-        result      (time (parse8 input))
+        result      [(time (parse input))]
 
         _           (println "Result:" result)
 
@@ -506,9 +432,7 @@
         formula     (first formulae)
 
 
-        unused-symbols (clojure.set/difference all-symbols (map :id (symbols formula)))
-
-        ]
+        unused-symbols (clojure.set/difference all-symbols (map :id (symbols formula)))]
 
     (println "RESULT:" formula)
 

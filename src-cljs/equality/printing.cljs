@@ -6,31 +6,31 @@
   (str "_" (:token expr)))
 
 (defmethod expr-str :type/num [expr]
-  (str (:token expr)))
+  (str (if (:certain (meta expr)) "@" "") (:token expr)))
 
 (defmethod expr-str :type/var [expr]
-  (str (:token expr)))
+  (str (if (:certain (meta expr)) "@" "") (:token expr)))
 
 (defmethod expr-str :type/pow [expr]
-  (str (expr-str (:base expr)) "^[" (expr-str (:exponent expr)) "]"))
+  (str (if (:certain (meta expr)) "@" "") (expr-str (:base expr)) "^[" (expr-str (:exponent expr)) "]"))
 
 (defmethod expr-str :type/add [expr]
-  (str (expr-str (:left-op expr)) " + " (expr-str (:right-op expr))))
+  (str (if (:certain (meta expr)) "@" "") (expr-str (:left-op expr)) " + " (expr-str (:right-op expr))))
 
 (defmethod expr-str :type/sub [expr]
-  (str (expr-str (:left-op expr)) " - " (expr-str (:right-op expr))))
+  (str (if (:certain (meta expr)) "@" "") (expr-str (:left-op expr)) " - " (expr-str (:right-op expr))))
 
 (defmethod expr-str :type/mult [expr]
-  (str "[" (expr-str (:left-op expr)) (expr-str (:right-op expr)) "]"))
+  (str (if (:certain (meta expr)) "@" "") "[" (expr-str (:left-op expr)) (expr-str (:right-op expr)) "]"))
 
 (defmethod expr-str :type/eq [expr]
-  (str (expr-str (:left-op expr)) " = " (expr-str (:right-op expr))))
+  (str (if (:certain (meta expr)) "@" "") (expr-str (:left-op expr)) " = " (expr-str (:right-op expr))))
 
 (defmethod expr-str :type/frac [expr]
-  (str "[" (expr-str (:numerator expr)) "] / [" (expr-str (:denominator expr)) "]"))
+  (str (if (:certain (meta expr)) "@" "")  "[" (expr-str (:numerator expr)) "] / [" (expr-str (:denominator expr)) "]"))
 
 (defmethod expr-str :type/bracket [expr]
-  (str "(" (expr-str (:child expr)) ")"))
+  (str (if (:certain (meta expr)) "@" "") "(" (expr-str (:child expr)) ")"))
 
 (defn print-expr [expr]
   (js/console.log (expr-str expr)))
