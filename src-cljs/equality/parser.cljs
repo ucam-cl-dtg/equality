@@ -142,14 +142,15 @@
                                          (if (and (isa? (:type potential-num) :type/symbol)
                                                   (numeric? (:token potential-num)))
                                            ;; Replace
-                                           (with-meta (merge potential-num {:type :type/num
-                                                                            :src potential-num
-                                                                            :symbol-count 1}) {:certain true})
+                                           (merge potential-num {:type :type/num
+                                                                 :src potential-num
+                                                                 :symbol-count 1})
                                            ;; Do not replace
                                            potential-num)) input))]
                      (if (= rtn (set input))
                        []
-                       [rtn])))}
+                       [rtn])))
+           :divide (fn [input] #{})}
    "var" {:apply (fn [input]
                    ;; This rule is unusual - it replaces all var symbols with :type/var expressions. No need to do one at a time.
                    (let [rtn (set (map (fn [potential-var]
@@ -159,14 +160,15 @@
                                                   (= (count (:token potential-var)) 1)
                                                   (not (contains? non-var-symbols (:token potential-var))))
                                            ;; Replace
-                                           (with-meta (merge potential-var {:type :type/var
-                                                                            :src potential-var
-                                                                            :symbol-count 1}) {:certain true})
+                                           (merge potential-var {:type :type/var
+                                                                 :src potential-var
+                                                                 :symbol-count 1})
                                            ;; Do not replace
                                            potential-var)) input))]
                      (if (= rtn (set input))
                        []
-                       [rtn])))}
+                       [rtn])))
+           :divide (fn [input] #{})}
    "horiz-line" {:apply (fn [input]
                           ;; Take a set of entities. Find the first :line and return a list of two sets of entities. One where the line has been replaced with subtract, one where it's been replaced with :frac
                           (let [line (first (filter #(and (isa? (:type %) :type/symbol)
@@ -179,7 +181,8 @@
                                  (conj remaining-input (merge line {:token "-"
                                                                     :src line
                                                                     :symbol-count 1}))])
-                              [])))}
+                              [])))
+           :divide (fn [input] #{})}
 
    "power" {:apply (fn [input]
 
@@ -212,7 +215,8 @@
                                                                 :exponent e
                                                                 :symbol-count (+ (:symbol-count b)
                                                                                  (:symbol-count e))}
-                                                               (geom/bbox-combine b e))))))))}
+                                                               (geom/bbox-combine b e))))))))
+           :divide (fn [input] #{})}
    "adjacent-mult" {:apply (fn [input]
 
                              ;; Potential coefficients are expressions that have higher precedence than :type/mult
@@ -231,8 +235,8 @@
                                                                                                   (> (:left %) (- (geom/bbox-right left) (* 0.5 (:width %))))
                                                                                                   (> (:left %) (:x (geom/bbox-middle left)))
                                                                                                   #_(if (= (:type left) :type/pow)
-                                                                                                    (> (geom/bbox-bottom %) (:y (geom/bbox-middle (:base left))))
-                                                                                                    (> (geom/bbox-bottom %) (:y (geom/bbox-middle left))))
+                                                                                                      (> (geom/bbox-bottom %) (:y (geom/bbox-middle (:base left))))
+                                                                                                      (> (geom/bbox-bottom %) (:y (geom/bbox-middle left))))
                                                                                                   (>= (precedence (:type %)) (precedence :type/mult))
                                                                                                   (not= (:type %) :type/num)
                                                                                                   (if (= (:type %) :type/pow)
@@ -260,11 +264,22 @@
                                ;; where each element is a list of new result sets, one for each potential multiplicand.
                                ;; Join these nested lists together into a final list of results.
 
-                               (apply concat result-sets-list)))}
+                               (apply concat result-sets-list)))
+           :divide (fn [input] #{})}
 
-   "addition" {:apply (binary-op-rule "+" :type/add)}
-   "subtraction" {:apply (binary-op-rule "-" :type/sub)}
-   "equals" {:apply (binary-op-rule "=" :type/eq)}
+   "addition" {:apply (binary-op-rule "+" :type/add)
+               :divide (fn [input] #{})}
+   "subtraction" {:apply (binary-op-rule "-" :type/sub)
+                  :divide (fn [input] #{})}
+   "equals" {:apply (binary-op-rule "=" :type/eq)
+             :divide (fn [input]
+                       (let [eqs (filter #(and (isa? (:type %) :type/symbol)
+                                               (= (:token %) "=")) input)]
+                         (apply concat (for [eq eqs
+                                             :let [remaining-input (disj input eq)
+                                                   left-children (filter #(< (geom/bbox-right %) (:x (geom/bbox-middle eq))) remaining-input)
+                                                   right-children (filter #(> (:left %) (:x (geom/bbox-middle eq))) remaining-input)]]
+                                         [(set left-children) (set right-children)]))))}
    "fraction" {:apply (fn [input]
                         (let [frac-lines (filter #(and (isa? (:type %) :type/symbol)
                                                        (= (:token %) :frac)) input)
@@ -301,7 +316,8 @@
                                                                                                   (:symbol-count numerator)
                                                                                                   (:symbol-count denominator))}
                                                                                 (geom/bbox-combine t numerator denominator)))))]
-                          (apply concat result-sets-list)))}
+                          (apply concat result-sets-list)))
+               :divide (fn [input] #{})}
    "sqrt" {:apply (fn [input]
                     (let [radicals (filter #(and (isa? (:type %) :type/symbol)
                                                  (= (:token %) :sqrt)) input)
@@ -312,13 +328,14 @@
                                                  :when (= 1 (count potential-radicands))]
                                              (for [radicand potential-radicands
                                                    :let [remaining-input (disj remaining-input radicand)]]
-                                               (conj remaining-input (with-meta (merge {:id (:id r)
-                                                                                        :type :type/sqrt
-                                                                                        :src r
-                                                                                        :radicand radicand
-                                                                                        :symbol-count (+ 1 (:symbol-count radicand))}
-                                                                                       (geom/bbox-combine r radicand)) {:certain true}))))]
-                      (apply concat result-sets-list)))}
+                                               (conj remaining-input (merge {:id (:id r)
+                                                                             :type :type/sqrt
+                                                                             :src r
+                                                                             :radicand radicand
+                                                                             :symbol-count (+ 1 (:symbol-count radicand))}
+                                                                            (geom/bbox-combine r radicand)))))]
+                      (apply concat result-sets-list)))
+           :divide (fn [input] #{})}
    "brackets" {:apply (fn [input]
                         (let [brackets (filter #(and (isa? (:type %) :type/symbol)
                                                      (= (:token %) :brackets)) input)
@@ -327,62 +344,85 @@
 
                                                            contained-symbols (set (filter #(geom/box-contains-box b %) (apply concat (map symbols remaining-input))))
                                                            potential-children (filter #(and (isa? (:type %) :type/expr)
-                                                                                                 (geom/box-contains-box b %)) remaining-input)]
-                                                     :when (and (= 1 (count potential-children))
-                                                                #_(do (println "contained:" contained-symbols ", child syms:" (set (symbols (first potential-children)))) true)
-                                                                (= contained-symbols (set (symbols (first potential-children)))))]
-                                                 (do (println "here!")
-                                                     (for [child potential-children
-                                                           :let [remaining-input (disj remaining-input child)]]
-                                                       (conj remaining-input (with-meta (merge {:id (:id b)
-                                                                                                :type :type/bracket
-                                                                                                :src b
-                                                                                                :child child
-                                                                                                :symbol-count (+ 1 (:symbol-count child))}
-                                                                                               (geom/bbox-combine b child)) {:certain true})))))]
-                          (apply concat result-sets-list)))}})
+                                                                                            (geom/box-contains-box b %)) remaining-input)]
+                                                     :when (not-empty potential-children)]
+                                                 (for [child potential-children
+                                                       :let [remaining-input (disj remaining-input child)]]
+                                                   (conj remaining-input (merge {:id (:id b)
+                                                                                 :type :type/bracket
+                                                                                 :src b
+                                                                                 :child child
+                                                                                 :symbol-count (+ 1 (:symbol-count child))}
+                                                                                (geom/bbox-combine b child)))))]
+                          (apply concat result-sets-list)))
+               :divide (fn [input]
+                         (let [brackets (filter #(and (isa? (:type %) :type/symbol)
+                                                      (= (:token %) :brackets)) input)]
+                           (map (fn [b]
+                                  (let [remaining-input (disj input b)
+                                        contained-items (filter #(geom/box-contains-box b %) remaining-input)]
+                                    (set contained-items))) brackets)))}})
 
-(defn parse [input]
-  (loop [i 0
-         j 0
-         seen {}
-         results #{}
-         restart-substitutions {}
-         [head & rest :as full-input] [input]]
-    (let [level (:level (meta head))
-          parent (:parent (meta head))
-          head-results (apply concat (for [[k r] rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
-          ;;head-results (filter (fn [result] (not (contains? seen result))) head-results)
+(declare parse)
+(def parse
+  (memoize
+   (fn [input]
+     (loop [i 0
+            j 0
+            seen {}
+            results #{}
+            [head & rest :as full-input] [input]]
+       (let [level (:level (meta head))
+             parent (:parent (meta head))
 
-          certain-expr (first (apply concat (map (fn [result] (filter (fn [sym] (:certain (meta sym))) result)) head-results)))
-          ]
+             _ (if (= 1 (count head))
+                 (println "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
+                 (print "Level" level ", run" j ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent)
+                 )
+
+             head-subtrees (filter #(> (count %) 1) (apply concat (for [[k r] rules] ((:divide r) head))))
+
+             ;; Gather together as many non-overlapping subtrees as possible
+
+             disjoint-subtrees (reduce (fn [acc subtree] (if (empty? (apply clojure.set/intersection subtree acc)) (conj acc subtree) acc)) [(first head-subtrees)] (next head-subtrees))
+
+             ;; For each non-overlapping subtree, parse that subtree and replace its src with the result.
+
+             head (loop [i 0
+                         new-head head
+                         [st & sts] disjoint-subtrees]
+                    (if st
+                      (do
+                        ;;(print ">>>>>>>>>>>>  Parsing subtree:" (map expr-str st))
+                        (let [result (first (parse st))]
+                          ;;(print "<<<<<<<<<<<<<< Got subtree result:" (map expr-str  result))
+                          (if (not= 1 (count result))
+                            #{} ;; We failed. So empty the head to prevent anything else from spawning on this part of the tree.
+                            (recur (inc i) (conj (clojure.set/difference new-head st) (first result)) sts))))
+                      new-head))
 
 
-      (if (= 1 (count head))
-        (println "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
-        (print "Level" level ", run" j ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent (if (empty? head-results) "BACKTRACKING" ""))
-        )
+             head-results (apply concat (for [[k r] rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
+             head-results (filter (fn [result] (not (contains? seen result))) head-results)
 
-      (if certain-expr
 
-        (let [certain-src (symbols certain-expr)
-              new-restart-substitutions (apply assoc restart-substitutions (apply concat (map (fn [sym] [sym (with-meta certain-expr nil)]) certain-src)))
-              new-input (clojure.set/union (clojure.set/difference input (set (keys new-restart-substitutions))) (set (vals new-restart-substitutions)))]
-          (println "Restarting because of" (expr-str certain-expr) "with new input:" (interpose " | " (map expr-str new-input)))
-          (recur 0 (inc j) {} results new-restart-substitutions [new-input]))
+             ]
 
-        (if (or (not head)
-                (and (not-empty results)
-                     (= 1 (count (first results)))))
-          (do
-            (println "Searched" i "sets.")
-            results)
-          (recur (inc i)
-                 j
-                 (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
-                 (sort-by count (conj results head))
-                 restart-substitutions
-                 (sort-by count (distinct (concat rest head-results)))))))))
+
+
+
+         (if (or (not head)
+                 (and (not-empty results)
+                      (= 1 (count (first results)))
+                      ))
+           (do
+             (println "Searched" i "sets.")
+             results)
+           (recur (inc i)
+                  j
+                  (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
+                  (if (empty? head) results (sort-by count (conj results head)))
+                  (sort-by count (distinct (concat rest head-results))))))))))
 
 
 (defn to-clj-input [input]
@@ -391,7 +431,10 @@
                                                                      (and (= :token k)
                                                                           (string? v)
                                                                           (= (nth v 0) ":")) {k (keyword (.replace v ":" ""))}
-                                                                     :else {k v})) m)))) (js->clj input :keywordize-keys true))))
+                                                                          :else {k v})) m)))) (js->clj input :keywordize-keys true))))
+
+
+
 (defn without-overlap [s]
   (set (filter #(not (:overlap %)) s)))
 
@@ -413,7 +456,7 @@
 
         result      (time (parse input))
 
-        ;;_           (println "Result:" result)
+        _           (println "Result:" result)
 
         best-result (first result)
 
