@@ -409,7 +409,7 @@
 
         ;; Perform a recursive divide-and-conquer parse on any subtrees the rules give us.
 
-        (let [subtrees          (filter #(> (count %) 1) (apply concat (for [[k r] rules] ((:divide r) head))))
+        (let [subtrees          (reverse (sort-by count (filter #(> (count %) 1) (apply concat (for [[k r] rules] ((:divide r) head))))))
 
               ;; Gather together as many non-overlapping subtrees as possible
 
