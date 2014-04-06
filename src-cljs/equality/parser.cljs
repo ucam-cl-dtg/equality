@@ -44,34 +44,34 @@
   [expr])
 
 (defmethod symbols :type/num [expr]
-  [(symbols (:src expr))])
+  (symbols (:src expr)))
 
 (defmethod symbols :type/var [expr]
-  [(symbols (:src expr))])
+  (symbols (:src expr)))
 
 (defmethod symbols :type/add [expr]
-  (concat [(symbols (:src expr))] (symbols (:left-op expr)) (symbols (:right-op expr))))
+  (concat (symbols (:src expr)) (symbols (:left-op expr)) (symbols (:right-op expr))))
 
 (defmethod symbols :type/sub [expr]
-  (concat [(symbols (:src expr))] (symbols (:left-op expr)) (symbols (:right-op expr))))
+  (concat (symbols (:src expr)) (symbols (:left-op expr)) (symbols (:right-op expr))))
 
 (defmethod symbols :type/mult [expr]
-  (concat (symbols (:left-op expr)) (symbols (:right-op expr)) (when (:id expr) [(symbols (:src expr))])))
+  (concat (symbols (:left-op expr)) (symbols (:right-op expr)) (when (:id expr) (symbols (:src expr)))))
 
 (defmethod symbols :type/eq [expr]
-  (concat [(symbols (:src expr))] (symbols (:left-op expr)) (symbols (:right-op expr))))
+  (concat (symbols (:src expr)) (symbols (:left-op expr)) (symbols (:right-op expr))))
 
 (defmethod symbols :type/frac [expr]
-  (concat [(symbols (:src expr))] (symbols (:numerator expr)) (symbols (:denominator expr))))
+  (concat (symbols (:src expr)) (symbols (:numerator expr)) (symbols (:denominator expr))))
 
 (defmethod symbols :type/pow [expr]
   (concat (symbols (:base expr)) (symbols (:exponent expr))))
 
 (defmethod symbols :type/sqrt [expr]
-  (concat [(symbols (:src expr))] (symbols (:radicand expr))))
+  (concat (symbols (:src expr)) (symbols (:radicand expr))))
 
 (defmethod symbols :type/bracket [expr]
-  (concat [(symbols (:src expr))] (symbols (:child expr))))
+  (concat (symbols (:src expr)) (symbols (:child expr))))
 
 (defn numeric? [str]
   (not (js/isNaN (js/parseFloat str))))
@@ -89,7 +89,7 @@
                          ;; Potential left operands are expressions to the left of the operator
                          ;; with precedence greater than that of this operator.
 
-                         potential-left-ops (filter #(and (geom/boxes-intersect? (geom/left-box t (* 2 (:width t)) (* 0.3 (:height t))) %)
+                         potential-left-ops (filter #(and (geom/boxes-intersect? (geom/left-box t (* 1.5 (:width t)) (* 0.3 (:height t))) %)
                                                           (< (geom/bbox-right %) (:x (geom/bbox-middle t)))
                                                           (< (geom/bbox-right %) (+ (:left t) (* 0.5 (:width %))))
                                                           (isa? (:type %) :type/expr)
@@ -98,11 +98,19 @@
                          ;; Potential right operands are expressions to the right of the operator
                          ;; with precedence greater than that of this operator.
 
-                         potential-right-ops (filter #(and (geom/boxes-intersect? (geom/right-box t (* 2 (:width t)) (* 0.3 (:height t))) %)
+                         potential-right-ops (filter #(and (geom/boxes-intersect? (geom/right-box t (* 1.5 (:width t)) (* 0.3 (:height t))) %)
                                                            (> (:left %) (:x (geom/bbox-middle t)))
                                                            (> (:left %) (- (geom/bbox-right t) (* 0.5 (:width %))))
                                                            (isa? (:type %) :type/expr)
-                                                           (>= (precedence (:type %)) (precedence type))) remaining-input)]
+                                                           (>= (precedence (:type %)) (precedence type))) remaining-input)
+
+                         #_all-left-symbols #_(set (filter #(and (< (geom/bbox-right %) (:x (geom/bbox-middle t)))
+                                                             (< (geom/bbox-right %) (+ (:left t) (* 0.5 (:width %)))))
+                                                       (apply concat (map symbols remaining-input))))
+
+                         #_all-right-symbols #_(set (filter #(and (> (:left %) (:x (geom/bbox-middle t)))
+                                                              (> (:left %) (- (geom/bbox-right t) (* 0.5 (:width %)))))
+                                                        (apply concat (map symbols remaining-input))))]
                    :when (and (not-empty potential-left-ops)
                               (not-empty potential-right-ops))]
                (for [left potential-left-ops
@@ -316,17 +324,22 @@
                                                      (= (:token %) :brackets)) input)
                               result-sets-list (for [b brackets
                                                      :let [remaining-input (disj input b)
+
+                                                           contained-symbols (set (filter #(geom/box-contains-box b %) (apply concat (map symbols remaining-input))))
                                                            potential-children (filter #(and (isa? (:type %) :type/expr)
-                                                                                            (geom/box-contains-box b %)) remaining-input)]
-                                                     :when (= 1 (count potential-children))]
-                                                 (for [child potential-children
-                                                       :let [remaining-input (disj remaining-input child)]]
-                                                   (conj remaining-input (with-meta (merge {:id (:id b)
-                                                                                            :type :type/bracket
-                                                                                            :src b
-                                                                                            :child child
-                                                                                            :symbol-count (+ 1 (:symbol-count child))}
-                                                                                           (geom/bbox-combine b child)) {:certain true}))))]
+                                                                                                 (geom/box-contains-box b %)) remaining-input)]
+                                                     :when (and (= 1 (count potential-children))
+                                                                #_(do (println "contained:" contained-symbols ", child syms:" (set (symbols (first potential-children)))) true)
+                                                                (= contained-symbols (set (symbols (first potential-children)))))]
+                                                 (do (println "here!")
+                                                     (for [child potential-children
+                                                           :let [remaining-input (disj remaining-input child)]]
+                                                       (conj remaining-input (with-meta (merge {:id (:id b)
+                                                                                                :type :type/bracket
+                                                                                                :src b
+                                                                                                :child child
+                                                                                                :symbol-count (+ 1 (:symbol-count child))}
+                                                                                               (geom/bbox-combine b child)) {:certain true})))))]
                           (apply concat result-sets-list)))}})
 
 (defn parse [input]
@@ -334,44 +347,42 @@
          j 0
          seen {}
          results #{}
-         certain #{}
+         restart-substitutions {}
          [head & rest :as full-input] [input]]
     (let [level (:level (meta head))
           parent (:parent (meta head))
           head-results (apply concat (for [[k r] rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
-          head-results (filter (fn [result] (not (contains? seen result))) head-results)
+          ;;head-results (filter (fn [result] (not (contains? seen result))) head-results)
 
-          new-certain-symbols (clojure.set/difference (set (apply concat (map (fn [result] (filter (fn [sym] (:certain (meta sym))) result)) head-results))) certain)
-          first-new-certain (first new-certain-symbols)
-
-          new-certain (conj certain first-new-certain)
-
-          head-results (if first-new-certain
-                         (filter (fn [result] (every? #(contains? result %) new-certain)) head-results)
-                         head-results)
-
+          certain-expr (first (apply concat (map (fn [result] (filter (fn [sym] (:certain (meta sym))) result)) head-results)))
           ]
+
 
       (if (= 1 (count head))
         (println "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
-        (print "Level" level ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent (if (empty? head-results) "BACKTRACKING" ""))
+        (print "Level" level ", run" j ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent (if (empty? head-results) "BACKTRACKING" ""))
         )
 
-      (when first-new-certain
-        (println "New certain expr:" first-new-certain))
-      (if (and head (< (count results) 100))
-        (recur (inc i)
-               j
-               (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
-               (if (= 1 (count head))
-                 (conj results (first head))
-                 results)
-               new-certain
-               (sort-by count (distinct (concat rest head-results))))
-        (do
-          (println "Finished searching" i "sets.")
-          ;;(println (contains? #{"a" "b"} nil))
-          results)))))
+      (if certain-expr
+
+        (let [certain-src (symbols certain-expr)
+              new-restart-substitutions (apply assoc restart-substitutions (apply concat (map (fn [sym] [sym (with-meta certain-expr nil)]) certain-src)))
+              new-input (clojure.set/union (clojure.set/difference input (set (keys new-restart-substitutions))) (set (vals new-restart-substitutions)))]
+          (println "Restarting because of" (expr-str certain-expr) "with new input:" (interpose " | " (map expr-str new-input)))
+          (recur 0 (inc j) {} results new-restart-substitutions [new-input]))
+
+        (if (or (not head)
+                (and (not-empty results)
+                     (= 1 (count (first results)))))
+          (do
+            (println "Searched" i "sets.")
+            results)
+          (recur (inc i)
+                 j
+                 (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
+                 (sort-by count (conj results head))
+                 restart-substitutions
+                 (sort-by count (distinct (concat rest head-results)))))))))
 
 
 (defn to-clj-input [input]
@@ -400,19 +411,11 @@
   (let [input       (to-clj-input input)
         all-symbols (set (map :id (flatten (map symbols input))))
 
-        result      [(time (parse input))]
+        result      (time (parse input))
 
-        _           (println "Result:" result)
+        ;;_           (println "Result:" result)
 
-        ;; Sort the results by the number of items left. Smaller is better (more combined). Then sort by number of raw symbols (not turned into var or num). Fewer is better.
-
-        best-parses (sort (fn [a b]
-                            (cond
-                             (> (count a) (count b)) 1
-                             (< (count a) (count b)) -1
-                             :else (compare-raw-symbol-count a b))) result)
-
-        best-result (first best-parses)
+        best-result (first result)
 
         ;; Within the best result, sort by number of symbols in combined items (more is better). Then sort by number of raw symbols (not turned into var or num). Fewer is better.
 
@@ -434,7 +437,7 @@
 
         unused-symbols (clojure.set/difference all-symbols (map :id (symbols formula)))]
 
-    (println "RESULT:" formula)
+    (println "RESULT:" (expr-str formula))
 
     (clj->js {:mathml  (mathml formula)
               :unusedSymbols unused-symbols})))
