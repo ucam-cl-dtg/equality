@@ -364,65 +364,62 @@
                                     (set contained-items))) brackets)))}})
 
 (declare parse)
-(def parse
-  (memoize
-   (fn [input]
-     (loop [i 0
-            j 0
-            seen {}
-            results #{}
-            [head & rest :as full-input] [input]]
-       (let [level (:level (meta head))
-             parent (:parent (meta head))
+(defn parse [input]
+  (loop [i 0
+         j 0
+         seen {}
+         results #{}
+         [head & rest :as full-input] [input]]
+    (let [level (:level (meta head))
+          parent (:parent (meta head))
 
-             _ (if (= 1 (count head))
-                 (println "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
-                 (print "Level" level ", run" j ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent)
-                 )
+          _ (if (= 1 (count head))
+              (println "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
+              (print "Level" level ", run" j ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent)
+              )
 
-             head-subtrees (filter #(> (count %) 1) (apply concat (for [[k r] rules] ((:divide r) head))))
+          head-subtrees (filter #(> (count %) 1) (apply concat (for [[k r] rules] ((:divide r) head))))
 
-             ;; Gather together as many non-overlapping subtrees as possible
+          ;; Gather together as many non-overlapping subtrees as possible
 
-             disjoint-subtrees (reduce (fn [acc subtree] (if (empty? (apply clojure.set/intersection subtree acc)) (conj acc subtree) acc)) [(first head-subtrees)] (next head-subtrees))
+          disjoint-subtrees (reduce (fn [acc subtree] (if (empty? (apply clojure.set/intersection subtree acc)) (conj acc subtree) acc)) [(first head-subtrees)] (next head-subtrees))
 
-             ;; For each non-overlapping subtree, parse that subtree and replace its src with the result.
+          ;; For each non-overlapping subtree, parse that subtree and replace its src with the result.
 
-             head (loop [i 0
-                         new-head head
-                         [st & sts] disjoint-subtrees]
-                    (if st
-                      (do
-                        ;;(print ">>>>>>>>>>>>  Parsing subtree:" (map expr-str st))
-                        (let [result (first (parse st))]
-                          ;;(print "<<<<<<<<<<<<<< Got subtree result:" (map expr-str  result))
-                          (if (not= 1 (count result))
-                            #{} ;; We failed. So empty the head to prevent anything else from spawning on this part of the tree.
-                            (recur (inc i) (conj (clojure.set/difference new-head st) (first result)) sts))))
-                      new-head))
+          head (loop [i 0
+                      new-head head
+                      [st & sts] disjoint-subtrees]
+                 (if st
+                   (do
+                     ;;(print ">>>>>>>>>>>>  Parsing subtree:" (map expr-str st))
+                     (let [result (first (parse st))]
+                       ;;(print "<<<<<<<<<<<<<< Got subtree result:" (map expr-str  result))
+                       (if (not= 1 (count result))
+                         #{} ;; We failed. So empty the head to prevent anything else from spawning on this part of the tree.
+                         (recur (inc i) (conj (clojure.set/difference new-head st) (first result)) sts))))
+                   new-head))
 
 
-             head-results (apply concat (for [[k r] rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
-             head-results (filter (fn [result] (not (contains? seen result))) head-results)
+          head-results (apply concat (for [[k r] rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
+          head-results (filter (fn [result] (not (contains? seen result))) head-results)
 
 
-             ]
+          ]
 
 
 
 
-         (if (or (not head)
-                 (and (not-empty results)
-                      (= 1 (count (first results)))
-                      ))
-           (do
-             (println "Searched" i "sets.")
-             results)
-           (recur (inc i)
-                  j
-                  (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
-                  (if (empty? head) results (sort-by count (conj results head)))
-                  (sort-by count (distinct (concat rest head-results))))))))))
+      (if (or (not head)
+              (and (not-empty results)
+                   (= 1 (count (first results)))))
+        (do
+          (println "Searched" i "sets.")
+          results)
+        (recur (inc i)
+               j
+               (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
+               (if (empty? head) results (sort-by count (conj results head)))
+               (sort-by count (distinct (concat rest head-results))))))))
 
 
 (defn to-clj-input [input]
@@ -456,7 +453,7 @@
 
         result      (time (parse input))
 
-        _           (println "Result:" result)
+        ;;_           (println "Result:" result)
 
         best-result (first result)
 
