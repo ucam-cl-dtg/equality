@@ -1,7 +1,8 @@
 (ns equality.parser
   (:use [equality.printing :only [print-expr mathml expr-str]])
   (:require [equality.geometry :as geom]
-            [clojure.set]))
+            [clojure.set]
+            [clojure.string]))
 
 (set! cljs.core/*print-newline* false)
 
@@ -129,7 +130,16 @@
                                               (geom/bbox-combine left right t)))))]
 
           ;; Concatenate all the result sets into a final list.
-          (apply concat result-sets-list))))
+      (apply concat result-sets-list))))
+
+(defn container-divide-fn [token]
+  (fn [input]
+    (let [containers (filter #(and (isa? (:type %) :type/symbol)
+                                  (= (:token %) token)) input)]
+      (map (fn [c]
+             (let [remaining-input (disj input c)
+                   contained-items (filter #(geom/box-contains-box c %) remaining-input)]
+               (set contained-items))) containers))))
 
 (def non-var-symbols #{"+" "-" "="})
 
@@ -335,7 +345,7 @@
                                                                              :symbol-count (+ 1 (:symbol-count radicand))}
                                                                             (geom/bbox-combine r radicand)))))]
                       (apply concat result-sets-list)))
-           :divide (fn [input] #{})}
+           :divide (container-divide-fn :sqrt)}
    "brackets" {:apply (fn [input]
                         (let [brackets (filter #(and (isa? (:type %) :type/symbol)
                                                      (= (:token %) :brackets)) input)
@@ -355,71 +365,109 @@
                                                                                  :symbol-count (+ 1 (:symbol-count child))}
                                                                                 (geom/bbox-combine b child)))))]
                           (apply concat result-sets-list)))
-               :divide (fn [input]
-                         (let [brackets (filter #(and (isa? (:type %) :type/symbol)
-                                                      (= (:token %) :brackets)) input)]
-                           (map (fn [b]
-                                  (let [remaining-input (disj input b)
-                                        contained-items (filter #(geom/box-contains-box b %) remaining-input)]
-                                    (set contained-items))) brackets)))}})
+               :divide (container-divide-fn :brackets)}})
+
+(defn expr-set-str [set]
+  (apply str (interpose " | " (map expr-str set))))
+
+(def ^:dynamic log-indent 0)
+(def ^:dynamic log (fn [& args] (apply print (apply str (repeat log-indent "    ")) (map #(clojure.string/replace (str %) "\n" (apply str "\n " (repeat log-indent "    "))) args))))
 
 (declare parse)
 (defn parse [input]
   (loop [i 0
-         j 0
          seen {}
          results #{}
-         [head & rest :as full-input] [input]]
-    (let [level (:level (meta head))
-          parent (:parent (meta head))
+         [head & queue :as full-input] [input]]
 
-          _ (if (= 1 (count head))
-              (println "RESULT on level" level ", set" i ":" (map expr-str head) ", parent:" parent)
-              (print "Level" level ", run" j ", set" i ", queued:" (count full-input) ", head:" (count head) (interpose " | " (map expr-str head)) ", parent:" parent)
-              )
+    ;; head contains the hypothesis we're working on now.
 
-          head-subtrees (filter #(> (count %) 1) (apply concat (for [[k r] rules] ((:divide r) head))))
+    (let [generation             (or (:generation (meta head)) 0)
+          parent                 (or (:parent (meta head)) "INPUT")
+          return-on-first-result true]
 
-          ;; Gather together as many non-overlapping subtrees as possible
+      (log "Hypothesis" i "(generation" (str generation ",") "parent" (str parent ")::") (expr-set-str head))
 
-          disjoint-subtrees (reduce (fn [acc subtree] (if (empty? (apply clojure.set/intersection subtree acc)) (conj acc subtree) acc)) [(first head-subtrees)] (next head-subtrees))
-
-          ;; For each non-overlapping subtree, parse that subtree and replace its src with the result.
-
-          head (loop [i 0
-                      new-head head
-                      [st & sts] disjoint-subtrees]
-                 (if st
-                   (do
-                     ;;(print ">>>>>>>>>>>>  Parsing subtree:" (map expr-str st))
-                     (let [result (first (parse st))]
-                       ;;(print "<<<<<<<<<<<<<< Got subtree result:" (map expr-str  result))
-                       (if (not= 1 (count result))
-                         #{} ;; We failed. So empty the head to prevent anything else from spawning on this part of the tree.
-                         (recur (inc i) (conj (clojure.set/difference new-head st) (first result)) sts))))
-                   new-head))
+      ;; head should have either one or many elements.
 
 
-          head-results (apply concat (for [[k r] rules] (map #(with-meta % {:level (+ 1 level) :parent i}) ((:apply r) head))))
-          head-results (filter (fn [result] (not (contains? seen result))) head-results)
-
-
-          ]
-
-
-
-
-      (if (or (not head)
-              (and (not-empty results)
-                   (= 1 (count (first results)))))
+      (if (= 1 (count head))
+        ;; If it's one, we don't need to do anything, just add it to results and move on (or possibly short-circuit and return).
         (do
-          (println "Searched" i "sets.")
-          results)
-        (recur (inc i)
-               j
-               (apply (partial assoc seen) (apply concat (map (fn [%] [% true]) head-results)))
-               (if (empty? head) results (sort-by count (conj results head)))
-               (sort-by count (distinct (concat rest head-results))))))))
+          (log "SINGLETON HEAD:" (expr-set-str head) "\n")
+          (let [new-results (sort-by count (conj results head))]
+            (if return-on-first-result
+              new-results
+              (if queue
+                (recur (inc i)
+                       (assoc seen head true)
+                       new-results
+                       queue)
+                new-results))))
+
+        ;; If it's many, do some parsing, possibly generate some new stuff for the queue, and move on.
+
+        ;; Perform a recursive divide-and-conquer parse on any subtrees the rules give us.
+
+        (let [subtrees          (filter #(> (count %) 1) (apply concat (for [[k r] rules] ((:divide r) head))))
+
+              ;; Gather together as many non-overlapping subtrees as possible
+
+              disjoint-subtrees (reduce (fn [acc subtree]
+                                          (let [acc-items (apply clojure.set/union acc)]
+                                            (if (empty? (clojure.set/intersection subtree acc-items))
+                                              (conj acc subtree)
+                                              acc)))
+                                        [(first subtrees)] (next subtrees))
+
+              ;; Loop through disjoint subtrees, parsing them and replacing their symbols with their result.
+              ;; If a subtree parse fails, then this hypothesis (set of symbols) is guaranteed to fail, so set head to nil
+
+              head              (loop [i 0
+                                       new-head head
+                                       [st & sts] disjoint-subtrees]
+                                  (if st
+                                    (do
+                                      (log ">>>>>>>>>>>>  Parsing subtree:" (expr-set-str st))
+                                      (binding [log-indent (inc log-indent)]
+                                        (let [result (first (parse st))]
+                                          (log "<<<<<<<<<<<<<< Got subtree result:" (expr-set-str  result))
+                                          (if (not= 1 (count result))
+                                            nil ;; We failed. So return nil to prevent anything else from spawning on this part of the tree.
+                                            (recur (inc i) (conj (clojure.set/difference new-head st) (first result)) sts)))))
+                                    new-head))]
+
+          ;; Now we've parsed and combined together at least some of the symbols in subtrees, we're hopefully left with a simpler head.
+          ;; Note that head cannot have a single element, because we can't have a subtree that consumes all the symbols. If we did, we'd fall into an infinite loop above.
+
+          (let [new-results (sort-by count (conj results head))]
+            (cond
+
+             ;; head could be nil,  which means a subtree failed to parse, so we should fail.
+             (= nil head) (do
+                            (log "SUBTREE PARSE FAILED\n")
+                            new-results)
+
+             ;; or head could have many elements, if we're just not done yet.
+
+             :else (let [ ;; Apply the rules in the hope of combining more symbols.
+                         head-results (apply concat (for [[k r] rules] (map #(with-meta % {:generation (+ 1 generation) :parent i}) ((:apply r) head))))
+
+                         ;; Discard any results we've already seen.
+                         head-results (filter (fn [result] (not (contains? seen result))) head-results)
+
+                         new-queue (sort-by count (distinct (concat queue head-results)))]
+
+                     (if (not-empty head-results)
+                       (log "New hypotheses:\n " (apply str (interpose "\n  " (map expr-set-str head-results))))
+                       (log "No further results. Discarding hypothesis."))
+
+                     (if (not-empty new-queue)
+                       (recur (inc i)
+                              (assoc seen head true)
+                              new-results
+                              new-queue)
+                       new-results)))))))))
 
 
 (defn to-clj-input [input]
@@ -483,5 +531,8 @@
               :unusedSymbols unused-symbols})))
 
 (set! (.-onmessage js/self) (fn [e]
-                              (let [symbols (.-data.symbols e)]
-                                (.postMessage js/self (get-best-results symbols)))))
+                              (let [symbols (.-data.symbols e)
+                                    results (get-best-results symbols)
+                                    ;; results (binding [log (fn [&args] nil)] (get-best-results symbols))
+                                    ]
+                                (.postMessage js/self results))))
