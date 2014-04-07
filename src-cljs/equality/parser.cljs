@@ -1,7 +1,7 @@
 (ns equality.parser
-  (:use [equality.printing :only [print-expr mathml expr-str]])
+  (:use [equality.printing :only [print-expr mathml expr-str]]
+        [clojure.set :only [intersection union difference]])
   (:require [equality.geometry :as geom]
-            [clojure.set]
             [clojure.string]))
 
 (set! cljs.core/*print-newline* false)
@@ -414,8 +414,8 @@
               ;; Gather together as many non-overlapping subtrees as possible
 
               disjoint-subtrees (reduce (fn [acc subtree]
-                                          (let [acc-items (apply clojure.set/union acc)]
-                                            (if (empty? (clojure.set/intersection subtree acc-items))
+                                          (let [acc-items (apply union acc)]
+                                            (if (empty? (intersection subtree acc-items))
                                               (conj acc subtree)
                                               acc)))
                                         [(first subtrees)] (next subtrees))
@@ -434,7 +434,7 @@
                                           (log "<<<<<<<<<<<<<< Got subtree result:" (expr-set-str  result))
                                           (if (not= 1 (count result))
                                             nil ;; We failed. So return nil to prevent anything else from spawning on this part of the tree.
-                                            (recur (inc i) (conj (clojure.set/difference new-head st) (first result)) sts)))))
+                                            (recur (inc i) (conj (difference new-head st) (first result)) sts)))))
                                     new-head))]
 
           ;; Now we've parsed and combined together at least some of the symbols in subtrees, we're hopefully left with a simpler head.
@@ -451,7 +451,7 @@
              ;; or head could have many elements, if we're just not done yet.
 
              :else (let [ ;; Apply the rules in the hope of combining more symbols.
-                         head-results (apply concat (for [[k r] rules] (map #(with-meta % {:generation (+ 1 generation) :parent i}) ((:apply r) head))))
+                         head-results (apply concat (for [[k r] rules] (map #(with-meta % {:generation (+ 1 generation) :parent i :rule k}) ((:apply r) head))))
 
                          ;; Discard any results we've already seen.
                          head-results (filter (fn [result] (not (contains? seen result))) head-results)
@@ -459,7 +459,7 @@
                          new-queue (sort-by count (distinct (concat queue head-results)))]
 
                      (if (not-empty head-results)
-                       (log "New hypotheses:\n " (apply str (interpose "\n  " (map expr-set-str head-results))))
+                       (log "New hypotheses:\n " (apply str (interpose "\n  " (map (fn [r] (str (expr-set-str r) "\t\t(RULE: " (:rule (meta r)) ")")) head-results))))
                        (log "No further results. Discarding hypothesis."))
 
                      (if (not-empty new-queue)
@@ -523,7 +523,7 @@
         formula     (first formulae)
 
 
-        unused-symbols (clojure.set/difference all-symbols (map :id (symbols formula)))]
+        unused-symbols (difference all-symbols (map :id (symbols formula)))]
 
     (println "RESULT:" (expr-str formula))
 
