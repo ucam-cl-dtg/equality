@@ -129,7 +129,7 @@ RSVP.on('error', function(reason) {
 	            }
 	        }
 	    }
-	    
+
 	    return {top: minY - 1,
 	            left: minX - 1,
 	            width: maxX - minX + 3,
@@ -397,6 +397,7 @@ RSVP.on('error', function(reason) {
 						style={{
 							left: -bounds.left, // N.B. This clips the whitespace from the top and left of the character!
 							top: -bounds.top,
+							lineHeight: this.props.spec.fontSize + "px",
 						}}>
 
 						{this.props.spec.token}
