@@ -7,8 +7,8 @@ require.config({
     paths: {
         react: 'react/react-with-addons',
         JSXTransformer: 'react/JSXTransformer',
-        jquery: 'http://code.jquery.com/jquery-1.11.0.min',
-        mathjax: 'http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+        jquery: '//code.jquery.com/jquery-1.11.0.min',
+        mathjax: '//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
     },
 });
 
