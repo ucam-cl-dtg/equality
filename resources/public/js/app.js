@@ -8,7 +8,7 @@ require.config({
         react: 'react/react-with-addons',
         JSXTransformer: 'react/JSXTransformer',
         jquery: '//code.jquery.com/jquery-1.11.0.min',
-        mathjax: '//cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
+        mathjax: '//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-AMS-MML_HTMLorMML'
     },
 });
 
