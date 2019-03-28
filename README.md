@@ -1,19 +1,7 @@
 # equality
 
-FIXME
+Equality is a tool for web-based equation entry using free-form layout of components drawn from a palette of symbols.
 
-## Prerequisites
+It is no longer being developed, but you can find a working demo at:
 
-You will need [Leiningen][1] 1.7.0 or above installed.
-
-[1]: https://github.com/technomancy/leiningen
-
-## Running
-
-To start a web server for the application, run:
-
-    lein ring server
-
-## License
-
-Copyright © 2013 FIXME
+[ucam-cl-dtg.github.io/equality/resources/public/index.html](https://ucam-cl-dtg.github.io/equality/resources/public/index.html).
