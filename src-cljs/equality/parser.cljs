@@ -1,5 +1,5 @@
 (ns equality.parser
-  (:use [equality.printing :only [print-expr mathml expr-str]]
+  (:use [equality.printing :only [print-expr mathml tex expr-str]]
         [clojure.set :only [intersection union difference]])
   (:require [equality.geometry :as geom]
             [clojure.string]))
@@ -19,6 +19,7 @@
 (derive :type/pow :type/expr)
 (derive :type/sqrt :type/expr)
 (derive :type/bracket :type/expr)
+;(derive :type/function-application :type/expr)
 ;; NOTE: :type/eq is not an expr!
 
 (defn precedence [type]
@@ -33,6 +34,8 @@
     :type/frac 15
     :type/pow 20
     :type/sqrt 999
+;    :type/func 8
+;    :type/function-application 999
     :type/bracket 999))
 
 
@@ -49,6 +52,9 @@
 
 (defmethod symbols :type/var [expr]
   (symbols (:src expr)))
+
+;(defmethod symbols :type/func [expr]
+;  (concat (:src expr)))
 
 (defmethod symbols :type/add [expr]
   (concat (symbols (:src expr)) (symbols (:left-op expr)) (symbols (:right-op expr))))
@@ -73,6 +79,9 @@
 
 (defmethod symbols :type/bracket [expr]
   (concat (symbols (:src expr)) (symbols (:child expr))))
+
+;(defmethod symbols :type/function-application [expr]
+;  (concat (symbols (:func expr)) (symbols (:arg expr))))
 
 (defn numeric? [str]
   (not (js/isNaN (js/parseFloat str))))
@@ -167,7 +176,8 @@
                                          (if (and (isa? (:type potential-var) :type/symbol)
                                                   (not (numeric? (:token potential-var)))
                                                   (string? (:token potential-var))
-                                                  (= (count (:token potential-var)) 1)
+                                                  (or (= (count (:token potential-var)) 1)
+                                                      (= (first (:token potential-var)) "\\"))
                                                   (not (contains? non-var-symbols (:token potential-var))))
                                            ;; Replace
                                            (merge potential-var {:type :type/var
@@ -179,6 +189,25 @@
                        []
                        [rtn])))
            :divide (fn [input] #{})}
+   ; "func" {:apply (fn [input]
+   ;                 ;; This rule is unusual - it replaces all function symbols with :type/func expressions. No need to do one at a time.
+   ;                 (let [rtn (set (map (fn [potential-func]
+   ;                                       (if (and (isa? (:type potential-func) :type/symbol)
+   ;                                                (not (numeric? (:token potential-func)))
+   ;                                                (string? (:token potential-func))
+   ;                                                (and (> (count (:token potential-func)) 1) ;; N.B. This means you can't write f(x)
+   ;                                                     #_(not= (first (:token potential-func)) "\\"))
+   ;                                                (not (contains? non-var-symbols (:token potential-func))))
+   ;                                         ;; Replace
+   ;                                         (merge potential-func {:type :type/func
+   ;                                                               :src potential-func
+   ;                                                               :symbol-count 1})
+   ;                                         ;; Do not replace
+   ;                                         potential-func)) input))]
+   ;                   (if (= rtn (set input))
+   ;                     []
+   ;                     [rtn])))
+   ;         :divide (fn [input] #{})}
    "horiz-line" {:apply (fn [input]
                           ;; Take a set of entities. Find the first :line and return a list of two sets of entities. One where the line has been replaced with subtract, one where it's been replaced with :frac
                           (let [line (first (filter #(and (isa? (:type %) :type/symbol)
@@ -248,13 +277,13 @@
                                                                                                       (> (geom/bbox-bottom %) (:y (geom/bbox-middle (:base left))))
                                                                                                       (> (geom/bbox-bottom %) (:y (geom/bbox-middle left))))
                                                                                                   (>= (precedence (:type %)) (precedence :type/mult))
-                                                                                                  (not= (:type %) :type/num)
-                                                                                                  (if (= (:type %) :type/pow)
-                                                                                                    (not= (:type (:base %)) :type/num)
-                                                                                                    true)
-                                                                                                  (if (= (:type %) :type/mult)
-                                                                                                    (not= (:type (:left-op %)) :type/num)
-                                                                                                    true)
+                                                                                                  ;(not= (:type %) :type/num) ; Allow this. The left op might be a function.
+                                                                                                  ;(if (= (:type %) :type/pow)
+                                                                                                  ;  (not= (:type (:base %)) :type/num)
+                                                                                                  ;  true)
+                                                                                                  ;(if (= (:type %) :type/mult)
+                                                                                                  ;  (not= (:type (:left-op %)) :type/num)
+                                                                                                  ;  true)
                                                                                                   (isa? (:type %) :type/expr)) remaining-input)]
                                                           :when (not-empty potential-right-ops)]
                                                       (for [right potential-right-ops
@@ -276,6 +305,29 @@
 
                                (apply concat result-sets-list)))
            :divide (fn [input] #{})}
+
+   ; "function-application" {:apply (fn [input]
+   ;                                  (let [potential-fns (filter #(isa? (:type %) :type/func) input)
+   ;                                        result-sets-list (for [left potential-fns
+   ;                                                              :let [remaining-input (disj input left)
+
+   ;                                                                    potential-args (filter #(and (geom/boxes-intersect? (geom/right-box left (* 1.5 (min (:width left) (:width %))) (* 0.3 (:height left))) %)
+   ;                                                                                                 (> (:left %) (- (geom/bbox-right left) (* 0.5 (:width %))))
+   ;                                                                                                 (> (:left %) (:x (geom/bbox-middle left)))
+   ;                                                                                                 (>= (precedence (:type %)) (precedence :type/func))
+   ;                                                                                                 (isa? (:type %) :type/expr)) remaining-input)]
+   ;                                                              :when (not-empty potential-args)]
+   ;                                                          (for [right potential-args
+   ;                                                                :let [remaining-input (disj remaining-input right)]]
+   ;                                                            (conj remaining-input (merge {:type :type/function-application
+   ;                                                                                          :func left
+   ;                                                                                          :arg right
+   ;                                                                                          :symbol-count (+ (:symbol-count left)
+   ;                                                                                                           (:symbol-count right))}
+   ;                                                                                         (geom/bbox-combine left right)))))]
+   ;                                    (apply concat result-sets-list)))
+
+   ;                         :divide (fn [input] #{})}
 
    "addition" {:apply (binary-op-rule "+" :type/add)
                :divide (fn [input] #{})}
@@ -528,6 +580,7 @@
     (println "RESULT:" (expr-str formula))
 
     (clj->js {:mathml  (mathml formula)
+              :tex     (tex formula)
               :unusedSymbols unused-symbols})))
 
 (set! (.-onmessage js/self) (fn [e]
